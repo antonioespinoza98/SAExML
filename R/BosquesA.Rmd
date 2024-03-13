@@ -1,0 +1,52 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+rm(list = ls())
+```
+
+
+# Librerias
+
+```{r}
+x <- c('rpart','rattle','DT','adabag','randomForest')
+lapply(x, require, character.only = TRUE)
+```
+
+# Base de datos
+
+```{r}
+load("./data/ingreso/encuesta_df_agg.Rdata")
+```
+
+# Base de datos de entrenamiento y prueba
+
+```{r, warning=FALSE}
+RNGkind(sample.kind = "Rounding")
+```
+
+```{r}
+set.seed(10)
+n = nrow(encuesta_df_agg)
+s = sample(1:n, round(0.8*n))
+
+train = encuesta_df_agg[s, ]
+test = encuesta_df_agg[-s, ]
+```
+
+## Dimensiones
+
+```{r}
+dim(train)
+dim(test)
+```
+
+# Arbol de decisión
+
+```{r}
+mod = rpart(ingreso ~ ., method = "class",maxdepth = 10, data = train)
+```
+

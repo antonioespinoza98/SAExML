@@ -12,7 +12,7 @@ rm(list = ls())
 # Librerias
 
 ```{r}
-x <- c('rpart','rattle','DT','adabag','randomForest','haven')
+x <- c('rpart','rattle','DT','adabag','randomForest','haven','dplyr')
 lapply(x, require, character.only = TRUE)
 ```
 
@@ -25,6 +25,23 @@ load("./data/ingreso/encuesta_df_agg.Rdata")
 ```{r}
 head(encuesta_df_agg)
 ```
+
+- La variable ingreso es inicialmente, ingreso per capita del hogar. No obstante, luego esta se 
+transforma y se crea el ingreso promedio per capita. 
+
+# Transformaciones
+
+```{r}
+encuesta_df_agg$area <- as.factor(encuesta_df_agg$area)
+
+encuesta_df_agg <- encuesta_df_agg %>%
+  select(-n, -dam, -ingreso) %>%
+  mutate_if(is.character, as.factor)
+
+save(encuesta_df_agg, file = "./data/ingreso/encuesta_df_agg.Rdata")
+summary(encuesta_df_agg)
+```
+
 # Base de datos de entrenamiento y prueba
 
 ```{r, warning=FALSE}
@@ -56,3 +73,4 @@ mod = rpart(pobreza ~ ., method = "class", data = train)
 ```{r}
 fancyRpartPlot(mod, palettes = c("Greens","Reds"))
 ```
+

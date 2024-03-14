@@ -28,8 +28,9 @@ list(base.columns)
 ############  ENTRENAMIENTO/PRUEBA
 ############
 ############################################################
-X = base.drop(base.columns[6], axis=1)
-y = base.iloc[:, 6]
+X = base.drop(base.columns[6:9], axis=1)
+y = base.iloc[:, 5]
+list(X.columns)
 X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.8, random_state= 25)
 lab_enc = preprocessing.LabelEncoder()
 y_train = lab_enc.fit_transform(y_train)
@@ -39,10 +40,10 @@ print(utils.multiclass.type_of_target(y_train))
 ############  MODELO
 ############
 ############################################################
-clf = tree.DecisionTreeClassifier(max_depth= 5)
+clf = tree.DecisionTreeClassifier()
 clf = clf.fit(X_train, y_train)
 
-tree.plot_tree(clf)
+tree.plot_tree(clf, feature_names= list(X.columns))
 plt.show()
 
 dot_data = tree.export_graphviz(clf, out_file=None,

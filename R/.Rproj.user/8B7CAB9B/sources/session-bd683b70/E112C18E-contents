@@ -1,0 +1,89 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+rm(list = ls())
+```
+
+
+# Librerias
+
+```{r}
+x <- c('rpart','rattle','DT','adabag','randomForest','haven','dplyr')
+lapply(x, require, character.only = TRUE)
+```
+
+# Base de datos
+
+```{r}
+load("pobreza/datos/encuesta_df_agg.Rdata")
+```
+
+```{r}
+head(encuesta_df_agg)
+names(encuesta_df_agg)
+```
+
+- La variable ingreso es inicialmente, ingreso per capita del hogar. No obstante, luego esta se 
+transforma y se crea el ingreso promedio per capita. 
+
+# Transformaciones
+
+```{r}
+encuesta_df_agg$area <- as.factor(encuesta_df_agg$area)
+encuesta_df_agg$pobreza <- as.factor(encuesta_df_agg$pobreza)
+base <- encuesta_df_agg %>%
+  select(-dam, -ingreso, -lp,-li, -fep) %>%
+  mutate_if(is.character, as.factor)
+summary(base)
+save(base, file = "pobreza/datos/base.Rdata")
+
+```
+
+# Base de datos de entrenamiento y prueba
+
+```{r}
+rm(list = ls())
+load("pobreza/datos/base.Rdata")
+```
+
+```{r, warning=FALSE}
+RNGkind(sample.kind = "Rounding")
+```
+
+```{r}
+set.seed(10)
+n = nrow(base)
+s = sample(1:n, round(0.8*n))
+
+train = base[s, ]
+test = base[-s, ]
+```
+
+## Dimensiones
+
+```{r}
+dim(train)
+dim(test)
+View(train)
+```
+
+# Arbol de decisión
+
+```{r}
+mod = rpart(pobreza ~ ., method = "class",cp = 0.0003, data = train, maxdepth = 6)
+```
+
+```{r}
+fancyRpartPlot(mod, palettes = c("Greens","Reds"))
+```
+
+
+
+```{r}
+windows();fancyRpartPlot(mod, palettes = c("Greens","Reds"))
+```
+

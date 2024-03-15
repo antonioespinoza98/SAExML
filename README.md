@@ -2,7 +2,7 @@
 
 --- 
 
-## Tabla de contenidos
+## Contenidos
 
 1. [Revisión bibliográfica](#revisión-bibliográfica)
 2. [Configuración de Python](#configuración-python)
@@ -21,7 +21,7 @@
 ---
 ## Revisión bibliográfica
 
-
+Se puede encontrar en [papers](Papers/)
 
 ---
 ## Configuración Python
@@ -97,6 +97,22 @@ Para la descarga de Visual Studio Code seguir el siguiente [enlace](https://code
 
 ### Extensiones
 
+las extensiones requeridas son:
+
+1. R de REditor for Visual Studio Code
+2. Python Debugger de Microsoft
+3. Python de Microsoft
+4. Pylance de Microsoft
+
+Algunas opcionales: 
+
+1. Markdown Preview Enhanced de Yiyi Wang
+2. Jupyter Slide Show de Microsoft
+3. Jupyter Notebook Renderers de Microsoft
+4. Jupyter Keymap de Microsoft
+5. Jupyter Cell Tags de Microsoft
+6. Jupyter de de Microsoft
+7. Excel Viewer de GrapeCity
 
 
 ---
@@ -106,16 +122,28 @@ Para la descarga de Visual Studio Code seguir el siguiente [enlace](https://code
 ---
 ## Python
 
-Una vez realizado los pasos en la sección [Configuración de Python](#configuración-python) y [Visual Studio Code](#visual-studio-code) se debe crear un ambiente de trabajo con las librerias necesarias para ejecutar el código. Para eso, se va a ejecutar el siguiente código que crea el ambiente basado en un archivo `.yml` que contiene el nombre del ambiente y las dependencias que son las librerias requeridas para ejecutar líneas de código. Este archivo se puede actualizar constantemente con la idea de mantener el ciclo activo de las actualizaciones de las librerias. 
+Una vez realizado los pasos en la sección [Configuración de Python](#configuración-python), [Visual Studio Code](#visual-studio-code) y [Git](#git) se debe crear un ambiente de trabajo con las librerias necesarias para ejecutar el código. Para eso, se va a ejecutar el siguiente código que crea el ambiente basado en un archivo `.yml` que contiene el nombre del ambiente y las dependencias que son las librerias requeridas para ejecutar líneas de código. Este archivo se puede actualizar constantemente con la idea de mantener el ciclo activo de las actualizaciones de las librerias. 
 1. Inicialmente vamos a ir a la barra del Visual Studio Code y dar clic en *Terminal* > *New Terminal*. Luego, en la esquina inferior derecha se muestra un símbolo `+` con un menú que se despliega hacia abajo, vamos a dar clic en *Configure Terminal Settings* y eso va a abrir una pestaña aparte con las configuraciones. A partir de acá en la barra de búsqueda buscamos *default* como se muestra en la imagen a continuación:
 
 ![default](imagenes/readme/terminal.png)
 
 Posteriormente, buscamos la opción ==Terminal > Integrated > Default Profile: Windows== y en el menú que se despliega seleccionamos **Command Prompt** como intérprete. 
 
-Una vez realizado esto, volvemos a la barra superior de *Visual Studio Code* y en *Terminal* seleccionamos *New Terminal*
+Una vez realizado esto, volvemos a la barra superior de *Visual Studio Code* y en *Terminal* seleccionamos *New Terminal* y esto debería desplegar algo similar a esto
+
+![terminalcmd](/imagenes/readme/terminalcmd.png)
 
 Para crear el ambiente, ejecute el siguiente código en la terminal 
+
+```cmd
+conda env create -f environment.yml
+```
+
+Una vez creado el ambiente, cada vez que se utilice se debe activar con el siguiente comando
+
+```cmd
+conda activate saenv
+```
 
 ---
 ## R

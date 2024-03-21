@@ -148,5 +148,23 @@ conda activate saenv
 ---
 ## R
 
----
-## Contacto
+Dentro del repositorio se encuentra una carpeta denominada R con los siguientes archivos:
+
+1. Data: La carpeta contiene los archivos generados previamente por Stalyn Guerrero
+    - ingreso
+    - pobreza
+    - pobreza extrema
+2. Pobreza 
+    - datos: Contiene los archivos de datos depurados para pobreza, realizado por Stalyn Guerrero. 
+3. BosquesA.Rmd
+    - Archivo de código R donde se emplea el modelo de árboles de decisión
+4. Discriminante.Rmd
+    - Archivo de código R donde se emplea el modelo de Análisis de Discriminante lineal
+5. MERF.Rmd
+    - Archivo de código R donde se emplea el modelo Mix Effects Random Forest
+6. Preparacion_base.R
+    - Archivo de código R donde se prepara la base. Código tomado de los archivos de preparación realizados por Stalyn Guerrero.
+7. SAExML.Rproj
+    - Archivo proyecto de Rstudio
+
+Para poder correr el código primero se debe clonar el repositorio y posteriormente en Rstudio abrir el proyecto **SAExML.Rproj**

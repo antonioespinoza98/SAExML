@@ -20,12 +20,9 @@ lapply(x, require, character.only = TRUE)
 
 ```{r}
 load("pobreza/datos/encuesta_df_agg.Rdata")
+
 ```
 
-```{r}
-head(encuesta_df_agg)
-names(encuesta_df_agg)
-```
 
 - La variable ingreso es inicialmente, ingreso per capita del hogar. No obstante, luego esta se 
 transforma y se crea el ingreso promedio per capita. 
@@ -33,8 +30,10 @@ transforma y se crea el ingreso promedio per capita.
 # Transformaciones
 
 ```{r}
+# pasar a factor estos dos
 encuesta_df_agg$area <- as.factor(encuesta_df_agg$area)
 encuesta_df_agg$pobreza <- as.factor(encuesta_df_agg$pobreza)
+# de character a factor para el resto
 base <- encuesta_df_agg %>%
   select(-dam, -ingreso, -lp,-li, -fep) %>%
   mutate_if(is.character, as.factor)
@@ -74,10 +73,139 @@ View(train)
 # Arbol de decisión
 
 ```{r}
-mod = rpart(pobreza ~ ., method = "class",cp = 0.001, data = train)
+mod = rpart(pobreza ~ ., method = "class",cp = 0.0007, data = train)
 ```
 
 ```{r}
 fancyRpartPlot(mod, palettes = c("Greens","Reds"))
 ```
+
+## Observaciones
+
+El árbol está conformado por 10 nodos terminales y tiene una profundidad de 10 
+
+## Clasificación
+
+Hacemos la clasificación de los registros de la base de test
+
+```{r}
+pred = predict(mod, newdata = test, type = "class")
+```
+
+Agregamos el vector de los valores pred a la base de datos
+
+```{r}
+test$pred <- pred
+head(cbind(test$pobreza, test$pred), 20)
+```
+
+## Matriz de confusión
+
+```{r}
+tabla = table(test$pobreza, test$pred)
+prop.table(tabla, 1)
+```
+
+Algunas anotaciones:
+
+1. El modelo no está clasificando bien. Ya que podemos obsevar en la matriz de confusión que si bien clasificó mal apenas 14 sujetos que fueron clasificados como pobres cuando en realida no lo son. El modelo está clasificando a los que si son pobre en su gran mayoría como no pobres. Esto quiere decir, que un 99% están mal clasificados. 
+Esto se debe a que si hacemos una tabla con la cantidad de pobres y no pobres en la base, las clases están desbalanceadas, por lo que el modelo no es capaz de capturar las características de los pobres debido a la poca información disponible, por lo que el modelo no logra clasificar de forma efectiva a los pobres o en otras palabras, no está aprendiendo de forma correcta. La solución a esto puede hacer una revisión de la base de datos y buscar si hay alguna forma de aumentar las clases. Otra forma sería juntar la base de datos de pobreza de otro pais como por ejemplo Panamá o también por medio de métodos de clasificación como KNN, generar observaciones sintéticas para nivelar las clases.
+
+
+# Utilizando encuesta como entrenamiento y censo como validación
+
+```{r}
+rm(list = ls())
+```
+
+```{r}
+# Base de datos para encuesta y para censo
+censo_mrp <- readRDS("pobreza/datos/censo_mrp.rds")
+encuesta_mrp <- readRDS("pobreza/datos/encuesta_mrp.rds")
+```
+
+```{r}
+head(censo_mrp);head(encuesta_mrp)
+```
+
+```{r}
+summary(censo_mrp)
+summary(encuesta_mrp)
+```
+
+
+## transformaciones 
+
+```{r}
+# inicialmente, a censo le quitamos n 
+censo_mrp <- censo_mrp %>% 
+  ungroup() %>% 
+  select(-distrito, -n) %>% 
+  mutate_if(is.character , as.factor) %>% 
+  mutate_if(is.numeric, as.factor)
+
+# Encuesta quitamos ingreso, lp, li y fep
+encuesta_mrp <- encuesta_mrp %>% 
+  select(-ingreso, -lp, -li,-fep) %>% 
+    mutate(
+  dam = recode(dam,
+               "01" = 1,
+               "02" = 2,
+               "03" = 3,
+               "04" = 4,
+               "05" = 5,
+               "06" = 6)) %>% 
+  mutate_if(is.character, as.factor) %>% 
+  mutate_if(is.numeric, as.factor)
+
+
+```
+
+Para encuesta no tenemos la variable etnia, por lo que hacemos un left join de censo con encuesta para agregar esta variable de acuerdo a los distritos en la encuesta.
+
+```{r}
+encuesta_mrp <- left_join(encuesta_mrp, censo_mrp %>% select(dam, etnia), by = "dam", relationship = "many-to-many")
+```
+
+
+
+```{r, warning=FALSE}
+RNGkind(sample.kind = "Rounding")
+```
+
+```{r}
+set.seed(10)
+```
+
+## Análisis exploratorio
+
+```{r}
+encuesta_mrp %>%
+  group_by(pobreza) %>% 
+  summarise(n_pobres = n())
+```
+
+Podemos observar que la cantidad de pobres es muchísimo más baja en comparación con los que no son pobres. Esto afecta la capacidad de los modelos de entrenar el algorítmo. Debido a que idealmente las clases deben estar balanceadas. 
+
+
+```{r}
+mod = rpart(pobreza ~ ., method = "class",cp = 0.01, data = encuesta_mrp)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

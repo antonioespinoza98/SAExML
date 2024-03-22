@@ -55,3 +55,56 @@ dot_data = tree.export_graphviz(clf, out_file=None,
                                 special_characters=True)  
 graph = graphviz.Source(dot_data)  
 graph.render(view= True, format= "png", directory= "./imagenes/python")
+
+############################################################
+############  UTILIZANDO ENCUESTA PARA MODELO
+############
+############################################################
+
+encuesta = pyreadr.read_r("./data/pobreza/encuesta_mrp.rds")
+censo = pyreadr.read_r("./data/pobreza/censo_mrp.rds")
+
+print(encuesta.keys())
+
+encuesta_mrp = encuesta[None]
+censo_mrp = censo[None]
+
+censo_mrp = censo_mrp.drop(columns=['area', 'etnia', 'sexo', 'edad', 'anoest', 'discapacidad', 'n'])
+censo_mrp = censo_mrp.apply(lambda x: x.astype('category') if x.dtype == 'object' else x)
+
+print(censo_mrp.describe())
+
+# For encuesta_mrp DataFrame
+encuesta_mrp = encuesta_mrp.drop(columns=['area', 'ingreso', 'lp', 'li', 'sexo', 'anoest', 'edad', 'discapacidad', 'fep'])
+encuesta_mrp['dam'] = encuesta_mrp['dam'].replace({'01': 1, '02': 2, '03': 3, '04': 4, '05': 5, '06': 6})
+encuesta_mrp = encuesta_mrp.apply(lambda x: x.astype('category') if x.dtype == 'object' else x)
+
+encuesta_mrp['dam'] = encuesta_mrp['dam'].astype('category')
+encuesta_mrp['pobreza'] = encuesta_mrp['pobreza'].astype('category')
+
+list(encuesta_mrp.columns)
+
+X = encuesta_mrp.drop(encuesta_mrp.columns[0:2], axis=1)
+y = encuesta_mrp.iloc[:, 1]
+list(X.columns)
+X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.8, random_state= 25)
+lab_enc = preprocessing.LabelEncoder()
+y_train = lab_enc.fit_transform(y_train)
+print(utils.multiclass.type_of_target(y_train))
+
+
+clf = tree.DecisionTreeClassifier()
+
+clf = clf.fit(X, y)
+
+tree.plot_tree(clf, feature_names= list(X.columns),filled=True, proportion=True,node_ids=True)
+plt.show()
+
+dot_data = tree.export_graphviz(clf, out_file=None,
+                                proportion= True,
+                                filled=True, rounded=True,
+                                feature_names= list(X.columns),
+                                class_names= True,  
+                                special_characters=True)  
+graph = graphviz.Source(dot_data)  
+graph.render(view= True, format= "png", directory= "./imagenes/python")

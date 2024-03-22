@@ -124,29 +124,19 @@ censo_mrp <- readRDS("pobreza/datos/censo_mrp.rds")
 encuesta_mrp <- readRDS("pobreza/datos/encuesta_mrp.rds")
 ```
 
-```{r}
-head(censo_mrp);head(encuesta_mrp)
-```
-
-```{r}
-summary(censo_mrp)
-summary(encuesta_mrp)
-```
-
-
 ## transformaciones 
 
 ```{r}
-# inicialmente, a censo le quitamos n 
-censo_mrp <- censo_mrp %>% 
-  ungroup() %>% 
-  select(-distrito, -n) %>% 
-  mutate_if(is.character , as.factor) %>% 
-  mutate_if(is.numeric, as.factor)
 
+# debemos de quitar algunas variables
+censo_mrp <- censo_mrp %>% 
+  select(-area, -etnia, -sexo,-edad,-anoest,-discapacidad,-n) %>% 
+  mutate_if(is.character , as.factor)
+summary(censo_mrp)
 # Encuesta quitamos ingreso, lp, li y fep
 encuesta_mrp <- encuesta_mrp %>% 
-  select(-ingreso, -lp, -li,-fep) %>% 
+  select(-area,-ingreso,-lp,-li,-sexo,-anoest,-edad,-discapacidad,
+         -fep) %>% 
     mutate(
   dam = recode(dam,
                "01" = 1,
@@ -155,19 +145,11 @@ encuesta_mrp <- encuesta_mrp %>%
                "04" = 4,
                "05" = 5,
                "06" = 6)) %>% 
-  mutate_if(is.character, as.factor) %>% 
-  mutate_if(is.numeric, as.factor)
+  mutate_if(is.character, as.factor)
 
-
+encuesta_mrp$dam <- as.factor(encuesta_mrp$dam)
+encuesta_mrp$pobreza <- as.factor(encuesta_mrp$pobreza)
 ```
-
-Para encuesta no tenemos la variable etnia, por lo que hacemos un left join de censo con encuesta para agregar esta variable de acuerdo a los distritos en la encuesta.
-
-```{r}
-encuesta_mrp <- left_join(encuesta_mrp, censo_mrp %>% select(dam, etnia), by = "dam", relationship = "many-to-many")
-```
-
-
 
 ```{r, warning=FALSE}
 RNGkind(sample.kind = "Rounding")
@@ -189,9 +171,38 @@ Podemos observar que la cantidad de pobres es muchísimo más baja en comparaci�
 
 
 ```{r}
-mod = rpart(pobreza ~ ., method = "class",cp = 0.01, data = encuesta_mrp)
+mod = rpart(pobreza ~ ., method = "class",cp = 0.0000005, data = encuesta_mrp)
 ```
 
+```{r}
+fancyRpartPlot(mod, palettes = c("Greens","Reds"))
+```
+
+## Observaciones
+
+El árbol está conformado por 10 nodos terminales y tiene una profundidad de 10 
+
+## Clasificación
+
+Hacemos la clasificación de los registros de la base de test
+
+```{r}
+pred = predict(mod, newdata = test, type = "class")
+```
+
+Agregamos el vector de los valores pred a la base de datos
+
+```{r}
+test$pred <- pred
+head(cbind(test$pobreza, test$pred), 20)
+```
+
+## Matriz de confusión
+
+```{r}
+tabla = table(test$pobreza, test$pred)
+prop.table(tabla, 1)
+```
 
 
 

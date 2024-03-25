@@ -7,3 +7,176 @@ editor_options:
 # Modelo Logit
 
 
+```{r}
+rm(list = ls())
+```
+
+```{r}
+options(scipen=999)
+```
+
+## Lectura de la base de datos
+
+```{r}
+encuesta_mrp <- readRDS("pobreza/datos/encuesta_mrp.rds")
+censo_mrp <-readRDS("pobreza/datos/censo_mrp.rds")
+```
+
+## librerias
+
+```{r}
+x <- c('rpart','rattle','DT','adabag','haven','dplyr','corrgram','psych')
+lapply(x, require, character.only = TRUE)
+```
+
+
+## transformaciones
+
+Las variables que estoy quitando son las variables que no vienen en el modelo de unidad.
+
+```{r}
+# debemos de quitar algunas variables
+censo_mrp <- censo_mrp %>% 
+  select(-X2016_crops.coverfraction, -X2016_urban.coverfraction,
+         -X2016_gHM, -accessibility, -accessibility_walking_only,
+         -area1, -sexo2,-edad2,-edad3, -edad4,-edad5,-anoest2,
+         -anoest3, -anoest4, -discapacidad1,-etnia1,-n,-etnia) %>% 
+  mutate_if(is.character , as.factor)
+summary(censo_mrp)
+# Encuesta quitamos ingreso, lp, li y fep
+encuesta_mrp <- encuesta_mrp %>% 
+  select(-X2016_crops.coverfraction, -X2016_urban.coverfraction,
+         -X2016_gHM, -accessibility, -accessibility_walking_only,
+         -area1, -sexo2,-edad2,-edad3, -edad4,-edad5,-anoest2,
+         -anoest3, -anoest4, -discapacidad1,-etnia1,-lp,-li,-fep,-ingreso) %>% 
+    mutate(
+  dam = recode(dam,
+               "01" = 1,
+               "02" = 2,
+               "03" = 3,
+               "04" = 4,
+               "05" = 5,
+               "06" = 6)) %>% 
+  mutate_if(is.character, as.factor)
+
+encuesta_mrp$dam <- as.factor(encuesta_mrp$dam)
+encuesta_mrp$pobreza <- as.factor(encuesta_mrp$pobreza)
+```
+
+Revisamos si hay algun missing value
+
+```{r}
+sapply(encuesta_mrp, function(x) sum(is.na(x)))
+```
+
+# Modelo
+
+```{r}
+mod = glm(pobreza ~ ., data = encuesta_mrp, family = binomial)
+```
+
+
+```{r}
+mod$coefficients
+```
+
+## Clasificacion
+
+```{r}
+p = predict(mod, type = "response")
+gr1 <- 1*(p >= 0.5)
+table(encuesta_mrp$pobreza, gr1)
+```
+
+
+```{r}
+mod1 = step(mod)
+```
+
+```{r}
+encuesta_mrp2 <- encuesta_mrp %>% 
+  select(dam, area,sexo,anoest,edad)
+
+summary(encuesta_mrp2)
+```
+
+
+```{r}
+anova(mod1, mod)
+summary(mod1)
+mod1$coefficients
+```
+
+```{r}
+p1 = predict(mod1, type = "response")
+gr2 <- 1*(p1 >= 0.5)
+table(encuesta_mrp$pobreza, gr2)
+```
+
+```{r}
+mean(p)
+mean(p1)
+```
+
+## PCA
+
+```{r}
+corrgram(encuesta_mrp[,c(8:21)], upper.panel = panel.conf)
+```
+
+Existe demasiada correlacion entre las variables auxiliares. 
+
+## Valores extremos
+
+```{r}
+lev = hat(encuesta_mrp[,c(8:21)])
+plot(lev)
+lim = 2*mean(lev)
+abline(h = lim)
+```
+
+```{r}
+encuesta_mrp$lev <- lev
+encuesta_mrp2 <- subset(encuesta_mrp, lev <= 2*mean(lev))
+```
+
+```{r}
+correl <- cor(encuesta_mrp2[,c(8:21)])
+```
+
+```{r}
+det(correl)
+```
+
+El determinante indica que hay alta multicolinealidad.
+
+```{r}
+cortest.bartlett(correl, n = nrow(encuesta_mrp2))
+```
+
+```{r}
+KMO(correl)
+```
+
+```{r}
+sapply(encuesta_mrp, function(x) scale(x))
+```
+
+```{r}
+encuesta_mrp2 <- encuesta_mrp2[,8:21]
+```
+
+```{r}
+pca1 = prcomp(encuesta_mrp2)
+```
+
+```{r}
+summary(pca1)
+```
+
+
+
+
+
+
+

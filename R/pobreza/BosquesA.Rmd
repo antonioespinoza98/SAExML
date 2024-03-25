@@ -169,7 +169,7 @@ encuesta_mrp %>%
 
 Podemos observar que la cantidad de pobres es muchísimo más baja en comparación con los que no son pobres. Esto afecta la capacidad de los modelos de entrenar el algorítmo. Debido a que idealmente las clases deben estar balanceadas. 
 
-
+## modelo
 ```{r}
 mod = rpart(pobreza ~ ., method = "class",cp = 0.0000005, data = encuesta_mrp)
 ```
@@ -205,13 +205,135 @@ prop.table(tabla, 1)
 ```
 
 
+# Arbol de decisión con 2018 y 2022, validación con 2019 para Costa Rica
+
+```{r}
+rm(list = ls())
+```
+
+*NOTA:* Estos archivos se crearon en el archivo de R `base2018.22.R` donde se cargaron directamente del BADEHOG y se le aplicaron las debidas transformaciones de acuerdo al archivo `Preparacion.R`. 
+
+```{r}
+encuesta_mrp18 <- readRDS("pobreza/datos/encuesta_mrp18.rds")
+encuesta_mrp19 <- readRDS("pobreza/datos/encuesta_mrp19.rds")
+encuesta_mrp22 <- readRDS("pobreza/datos/encuesta_mrp22.rds")
+```
+
+## Transformaciones
+
+A las 3 bases de datos se les aplica las mismas transformaciones.
+
+```{r}
+encuesta_mrp18 <- encuesta_mrp18 %>%  
+  select(-lp,-li,-fep,-ingreso) %>% # Se eliminan estas columnas
+    mutate(
+  dam = recode(dam, # Se le hizo una recodificacion a dam para que queden entre 0 y 6. 
+               "01" = 1,
+               "02" = 2,
+               "03" = 3,
+               "04" = 4,
+               "05" = 5,
+               "06" = 6)) %>% 
+  mutate_if(is.character, as.factor) # mutate para convertir las variables que deben ser factores. 
+encuesta_mrp18$dam <- as.factor(encuesta_mrp18$dam) 
+encuesta_mrp18$pobreza <- as.factor(encuesta_mrp18$pobreza)
+```
+
+```{r}
+encuesta_mrp19 <- encuesta_mrp19 %>% 
+  select(-lp,-li,-fep,-ingreso) %>% 
+    mutate(
+  dam = recode(dam,
+               "01" = 1,
+               "02" = 2,
+               "03" = 3,
+               "04" = 4,
+               "05" = 5,
+               "06" = 6)) %>% 
+  mutate_if(is.character, as.factor)
+
+encuesta_mrp19$dam <- as.factor(encuesta_mrp19$dam)
+encuesta_mrp19$pobreza <- as.factor(encuesta_mrp19$pobreza)
+
+```
 
 
+```{r}
+encuesta_mrp22 <- encuesta_mrp22 %>% 
+  select(-lp,-li,-fep,-ingreso) %>% 
+    mutate(
+  dam = recode(dam,
+               "01" = 1,
+               "02" = 2,
+               "03" = 3,
+               "04" = 4,
+               "05" = 5,
+               "06" = 6)) %>% 
+  mutate_if(is.character, as.factor)
+
+encuesta_mrp22$dam <- as.factor(encuesta_mrp22$dam)
+encuesta_mrp22$pobreza <- as.factor(encuesta_mrp22$pobreza)
+```
+
+```{r}
+table(encuesta_mrp18$pobreza)
+table(encuesta_mrp22$pobreza)
+```
+
+Base de datos que contenga solamente los pobres del año 2018. 
+
+```{r}
+encuesta_mrp18_pob <- subset(encuesta_mrp18, pobreza == 1)
+```
+
+juntamos a los que están en pobreza en el 2018 junto con el 2022.
+
+```{r}
+encuesta_mrp <- rbind(encuesta_mrp22, encuesta_mrp18_pob)
+```
+
+```{r}
+table(encuesta_mrp$pobreza)
+```
 
 
+## modelo
+```{r}
+mod = rpart(pobreza ~ ., method = "class", data = encuesta_mrp)
+```
 
+```{r}
+fancyRpartPlot(mod, palettes = c("Greens","Reds"))
+```
 
+## Observaciones
 
+El árbol está conformado por 6 nodos terminales y tiene una profundidad de 6 
+
+- Una persona que tenga entre 7 y 12 años de educación o más de 12 años de educación se clasifica como no pobre. 
+Mientras que una persona con educación básica, tenga menos de 65 años y su región de planificación sea 4, 5 o 6 (brunca, Huetar Caribe, Pacifico Central) es más probable que sea pobre. 
+
+## Clasificación
+
+Hacemos la clasificación de los registros de la base de test
+
+```{r}
+pred = predict(mod, newdata = encuesta_mrp19, type = "class")
+```
+
+Agregamos el vector de los valores pred a la base de datos
+
+```{r}
+encuesta_mrp19$pred <- pred
+head(cbind(encuesta_mrp19$pobreza, encuesta_mrp19$pred), 20)
+```
+
+## Matriz de confusión
+
+```{r}
+tabla = table(encuesta_mrp19$pobreza, encuesta_mrp19$pred)
+prop.table(tabla, 1)
+```
 
 
 

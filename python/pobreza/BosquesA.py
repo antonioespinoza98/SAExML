@@ -87,7 +87,13 @@ encuesta_mrp = encuesta_mrp.apply(lambda x: x.astype('category') if x.dtype == '
 encuesta_mrp['dam'] = encuesta_mrp['dam'].astype('category')
 encuesta_mrp['pobreza'] = encuesta_mrp['pobreza'].astype('category')
 
+common_columns = [col for col in encuesta_mrp.columns if col in censo_mrp.columns]
+censo_mrp = censo_mrp[common_columns]
+
+
+
 list(encuesta_mrp.columns)
+list(censo_mrp.columns)
 
 X = encuesta_mrp.drop(columns = ['pobreza'])
 y = encuesta_mrp.iloc[:, 6]
@@ -120,4 +126,9 @@ graph.render(view= True, format= "png", directory= "./imagenes/python")
 ############
 ############################################################
 
-clf.predict(censo_mrp)
+pred = clf.predict(censo_mrp)
+pred1 = pd.DataFrame(pred)
+pred1.value_counts()
+censo_mrp = pd.concat([censo_mrp, pred1])
+
+censo_mrp

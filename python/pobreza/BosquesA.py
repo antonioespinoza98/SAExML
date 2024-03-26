@@ -69,13 +69,18 @@ print(encuesta.keys())
 encuesta_mrp = encuesta[None]
 censo_mrp = censo[None]
 
-censo_mrp = censo_mrp.drop(columns=['area', 'etnia', 'sexo', 'edad', 'anoest', 'discapacidad', 'n'])
+censo_mrp = censo_mrp.drop(columns=['X2016_crops.coverfraction', 'X2016_urban.coverfraction', 'X2016_gHM', 'accessibility',
+                                     'accessibility_walking_only', 'area1', 'sexo2','edad2','edad3','edad4','edad5','anoest2',
+                                     'anoest3','anoest4','discapacidad1','etnia1','n','etnia'])
 censo_mrp = censo_mrp.apply(lambda x: x.astype('category') if x.dtype == 'object' else x)
 
 print(censo_mrp.describe())
 
-# For encuesta_mrp DataFrame
-encuesta_mrp = encuesta_mrp.drop(columns=['area', 'ingreso', 'lp', 'li', 'sexo', 'anoest', 'edad', 'discapacidad', 'fep'])
+# Para encuesta_mrp DataFrame
+encuesta_mrp = encuesta_mrp.drop(columns=['X2016_crops.coverfraction', 'X2016_urban.coverfraction', 'X2016_gHM',
+                                           'accessibility', 'accessibility_walking_only', 'area1',
+                                             'sexo2', 'edad2', 'edad3','edad4','edad5','anoest2','anoest3','anoest4','discapacidad1',
+                                             'etnia1','lp','li','fep','ingreso'])
 encuesta_mrp['dam'] = encuesta_mrp['dam'].replace({'01': 1, '02': 2, '03': 3, '04': 4, '05': 5, '06': 6})
 encuesta_mrp = encuesta_mrp.apply(lambda x: x.astype('category') if x.dtype == 'object' else x)
 
@@ -84,16 +89,17 @@ encuesta_mrp['pobreza'] = encuesta_mrp['pobreza'].astype('category')
 
 list(encuesta_mrp.columns)
 
-X = encuesta_mrp.drop(encuesta_mrp.columns[0:2], axis=1)
-y = encuesta_mrp.iloc[:, 1]
+X = encuesta_mrp.drop(columns = ['pobreza'])
+y = encuesta_mrp.iloc[:, 6]
 list(X.columns)
-X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.8, random_state= 25)
-lab_enc = preprocessing.LabelEncoder()
-y_train = lab_enc.fit_transform(y_train)
-print(utils.multiclass.type_of_target(y_train))
+
+# X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.8, random_state= 25)
+# lab_enc = preprocessing.LabelEncoder()
+# y_train = lab_enc.fit_transform(y_train)
+# print(utils.multiclass.type_of_target(y_train))
 
 
-clf = tree.DecisionTreeClassifier()
+clf = tree.DecisionTreeClassifier(ccp_alpha=0.001)
 
 clf = clf.fit(X, y)
 
@@ -108,3 +114,10 @@ dot_data = tree.export_graphviz(clf, out_file=None,
                                 special_characters=True)  
 graph = graphviz.Source(dot_data)  
 graph.render(view= True, format= "png", directory= "./imagenes/python")
+
+############################################################
+############  PREDICT
+############
+############################################################
+
+clf.predict(censo_mrp)

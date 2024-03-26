@@ -127,16 +127,20 @@ encuesta_mrp <- readRDS("pobreza/datos/encuesta_mrp.rds")
 ## transformaciones 
 
 ```{r}
-
 # debemos de quitar algunas variables
 censo_mrp <- censo_mrp %>% 
-  select(-area, -etnia, -sexo,-edad,-anoest,-discapacidad,-n) %>% 
+  select(-X2016_crops.coverfraction, -X2016_urban.coverfraction,
+         -X2016_gHM, -accessibility, -accessibility_walking_only,
+         -area1, -sexo2,-edad2,-edad3, -edad4,-edad5,-anoest2,
+         -anoest3, -anoest4, -discapacidad1,-etnia1,-n,-etnia) %>% 
   mutate_if(is.character , as.factor)
 summary(censo_mrp)
 # Encuesta quitamos ingreso, lp, li y fep
 encuesta_mrp <- encuesta_mrp %>% 
-  select(-area,-ingreso,-lp,-li,-sexo,-anoest,-edad,-discapacidad,
-         -fep) %>% 
+  select(-X2016_crops.coverfraction, -X2016_urban.coverfraction,
+         -X2016_gHM, -accessibility, -accessibility_walking_only,
+         -area1, -sexo2,-edad2,-edad3, -edad4,-edad5,-anoest2,
+         -anoest3, -anoest4, -discapacidad1,-etnia1,-lp,-li,-fep,-ingreso) %>% 
     mutate(
   dam = recode(dam,
                "01" = 1,
@@ -217,6 +221,17 @@ rm(list = ls())
 encuesta_mrp18 <- readRDS("pobreza/datos/encuesta_mrp18.rds")
 encuesta_mrp19 <- readRDS("pobreza/datos/encuesta_mrp19.rds")
 encuesta_mrp22 <- readRDS("pobreza/datos/encuesta_mrp22.rds")
+censo_mrp <- readRDS("pobreza/datos/censo_mrp.rds") %>% 
+  select(dam, area,sexo, anoest, edad) %>% 
+  mutate_if(is.character , as.factor) %>%  mutate(
+  dam = recode(dam,
+               "01" = 1,
+               "02" = 2,
+               "03" = 3,
+               "04" = 4,
+               "05" = 5,
+               "06" = 6)) 
+censo_mrp$dam <- as.factor(censo_mrp$dam)
 ```
 
 ## Transformaciones
@@ -318,21 +333,13 @@ Mientras que una persona con educación básica, tenga menos de 65 años y su re
 Hacemos la clasificación de los registros de la base de test
 
 ```{r}
-pred = predict(mod, newdata = encuesta_mrp19, type = "class")
+pred = predict(mod, newdata = censo_mrp, type = "class")
 ```
 
-Agregamos el vector de los valores pred a la base de datos
+
 
 ```{r}
-encuesta_mrp19$pred <- pred
-head(cbind(encuesta_mrp19$pobreza, encuesta_mrp19$pred), 20)
-```
-
-## Matriz de confusión
-
-```{r}
-tabla = table(encuesta_mrp19$pobreza, encuesta_mrp19$pred)
-prop.table(tabla, 1)
+table(pred)
 ```
 
 

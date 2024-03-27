@@ -69,24 +69,23 @@ print(encuesta.keys())
 encuesta_mrp = encuesta[None]
 censo_mrp = censo[None]
 
-censo_mrp = censo_mrp.drop(columns=['X2016_crops.coverfraction', 'X2016_urban.coverfraction', 'X2016_gHM', 'accessibility',
-                                     'accessibility_walking_only', 'area1', 'sexo2','edad2','edad3','edad4','edad5','anoest2',
-                                     'anoest3','anoest4','discapacidad1','etnia1','n','etnia'])
-censo_mrp = censo_mrp.apply(lambda x: x.astype('category') if x.dtype == 'object' else x)
+list(encuesta_mrp.columns)
+list(censo_mrp.columns)
 
+
+censo_mrp = censo_mrp.drop(columns=['etnia','n','distrito'])
+censo_mrp = censo_mrp.apply(lambda x: x.astype('category') if x.dtype == 'object' else x)
+censo_mrp['dam'] = censo_mrp['dam'].replace({'01': 1, '02': 2, '03': 3, '04': 4, '05': 5, '06': 6})
 print(censo_mrp.describe())
 
 # Para encuesta_mrp DataFrame
-encuesta_mrp = encuesta_mrp.drop(columns=['X2016_crops.coverfraction', 'X2016_urban.coverfraction', 'X2016_gHM',
-                                           'accessibility', 'accessibility_walking_only', 'area1',
-                                             'sexo2', 'edad2', 'edad3','edad4','edad5','anoest2','anoest3','anoest4','discapacidad1',
-                                             'etnia1','lp','li','fep','ingreso'])
+encuesta_mrp = encuesta_mrp.drop(columns=['lp','li','fep','ingreso'])
 encuesta_mrp['dam'] = encuesta_mrp['dam'].replace({'01': 1, '02': 2, '03': 3, '04': 4, '05': 5, '06': 6})
 encuesta_mrp = encuesta_mrp.apply(lambda x: x.astype('category') if x.dtype == 'object' else x)
 
 encuesta_mrp['dam'] = encuesta_mrp['dam'].astype('category')
 encuesta_mrp['pobreza'] = encuesta_mrp['pobreza'].astype('category')
-
+print(encuesta_mrp.describe())
 common_columns = [col for col in encuesta_mrp.columns if col in censo_mrp.columns]
 censo_mrp = censo_mrp[common_columns]
 
@@ -129,6 +128,3 @@ graph.render(view= True, format= "png", directory= "./imagenes/python")
 pred = clf.predict(censo_mrp)
 pred1 = pd.DataFrame(pred)
 pred1.value_counts()
-censo_mrp = pd.concat([censo_mrp, pred1])
-
-censo_mrp

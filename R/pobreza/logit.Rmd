@@ -148,6 +148,11 @@ correl <- cor(encuesta_mrp2[,c(8:21)])
 det(correl)
 ```
 
+```{r}
+sapply(encuesta_mrp2, function(x) sum(is.na(x)))
+```
+
+
 El determinante indica que hay alta multicolinealidad.
 
 ```{r}

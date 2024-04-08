@@ -4,5 +4,4 @@ editor_options:
   chunk_output_type: console
 ---
 
-Metodología del paper: A machine learning approach to small area estimation: predicting the helath, housing and well-being of the population of Netherlands.
 

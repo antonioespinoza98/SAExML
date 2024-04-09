@@ -4,4 +4,467 @@ editor_options:
   chunk_output_type: console
 ---
 
+De acuerdo a *Poverty Mapping in the Age of Machine Learning* se prueban tres modelos de XGBoosting machines, los cuales son: 
+
+-   Modelo XGBoost Machine con covariables de geoubicación únicamente.
+-   Modelo XGBoost Machine con covariables censales únicamente.
+-   Con todos los modelos. 
+
+```{r}
+rm(list = ls())
+```
+
+# Librerias
+
+```{r}
+x <- c('tidyverse','xgboost')
+lapply(x, require, character.only = TRUE)
+```
+
+```{r}
+set.seed(1998)
+```
+
+
+# Datos
+
+```{r}
+encuesta_mrp <- readRDS("ingreso/datos/encuesta_mrp1.rds")
+```
+
+```{r}
+# Encuesta quitamos ingreso, lp, li y fep
+encuesta_mrp <- encuesta_mrp %>% 
+  select(
+    # -X2016_crops.coverfraction, -X2016_urban.coverfraction,
+    #      -X2016_gHM, -accessibility, -accessibility_walking_only,
+         -area1, -sexo2,-edad2,-edad3, -edad4,-edad5,-anoest2,
+         -anoest3, -anoest4, -discapacidad1,-etnia1,-lp,-li,-fep,-pobreza) %>% 
+    mutate(
+  dam = recode(dam,
+               "01" = 1,
+               "02" = 2,
+               "03" = 3,
+               "04" = 4,
+               "05" = 5,
+               "06" = 6)) %>%
+  mutate_if(is.character, as.factor) %>% 
+  mutate(dam = as.factor(dam))
+
+summary(encuesta_mrp)
+```
+
+# Modelo con todas las covariables
+
+## Validación cruzada
+
+```{r}
+# Eta: Magnitud de las correciones que son hechas por cada predictor nuevo (learning rate)
+# max depth: profundidad de los árboles
+grid <- expand_grid(max_depth = seq(3, 6, 1), eta = seq(.2, .35, .01))
+y = encuesta_mrp[,3]
+encuesta_mrp_m <- xgb.DMatrix(data = as.matrix(sapply(encuesta_mrp[,-3], as.numeric)), label = as.matrix(sapply(y, as.numeric)))
+
+
+xgb_train_rmse <- numeric(nrow(grid))
+xgb_test_rmse <- numeric(nrow(grid))
+
+
+for(i in 1:nrow(grid)){
+  xgb_untuned = xgb.cv(
+    data = encuesta_mrp_m,
+    params = list(
+      objective = "reg:squarederror",
+      eta = grid$eta[i],
+      max_depth = grid$max_depth[i]
+    ),
+    nrounds = 100,
+    early_stopping_rounds = 3, # training with a validation set will stop if the performance does not improve for k rounds (3)
+    nfold = 5
+  )
+  
+  xgb_train_rmse[i] <-
+    xgb_untuned$evaluation_log$train_rmse_mean[xgb_untuned$best_iteration]
+  xgb_test_rmse[i] <-
+    xgb_untuned$evaluation_log$test_rmse_mean[xgb_untuned$best_iteration]
+  
+  cat(i, "\n")
+}
+```
+
+```{r}
+xgb_train_rmse <- xgb_train_rmse %>% 
+  tibble() %>% 
+  mutate(simulacion = seq(1:64))
+
+xgb_test_rmse <- xgb_test_rmse %>% 
+  tibble() %>% 
+  mutate(simulacion = seq(1:64))
+
+xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) + geom_line()
+
+#Guardamos las iteraciones para el primer modelo de la validación cruzada
+saveRDS(xgb_train_rmse, file = "ingreso/output/xgb_train_rmse_all.rds")
+
+
+grid[which.min(xgb_train_rmse$.), ] 
+```
+
+vamos a ajustar el modelo con los siguientes hiperparámetros: 
+
+max_depth = 6
+eta = 0.30
+
+```{r}
+modelo <- xgboost(params = list(
+  objective = "reg:squarederror",
+  eta = 0.30,
+  max_depth = 6),
+  nrounds = 1000,
+  # early_stopping_rounds = 3,
+  data = encuesta_mrp_m
+)
+
+ggplot(modelo$evaluation_log, aes(
+  x = iter,
+  y = train_rmse
+)) + geom_line() + geom_vline(xintercept = 71, col = "red")
+
+
+modelo$evaluation_log[which.min(modelo$evaluation_log$train_rmse), ]
+
+modelo$evaluation_log[71, ]
+
+saveRDS(modelo, file = "ingreso/output/modelo.rds")
+```
+
+- Podemos observar que en la creación de los árboles, luego de 71 iteraciones el Error Cuadrático Medio se estabiliza y tiene un cambio mínimo con respecto a la última iteración.
+
+
+## importancia de variables
+
+```{r}
+importancia <- xgb.importance(
+  feature_names = names(encuesta_mrp[,-3]),
+  model = modelo
+)
+
+p1 <- xgb.ggplot.importance(importancia)
+```
+
+# Modelo con solo covariables geo espaciales
+
+```{r}
+rm(list = ls())
+```
+
+## Datos
+
+```{r}
+encuesta_mrp <- readRDS("ingreso/datos/encuesta_mrp1.rds")
+```
+
+```{r}
+# Encuesta quitamos ingreso, lp, li y fep
+encuesta_mrp <- encuesta_mrp %>% 
+  select(
+    F182013_stable_lights, X2016_crops.coverfraction, X2016_urban.coverfraction, X2016_gHM, accessibility, 
+    accessibility_walking_only, ingreso
+  )
+
+summary(encuesta_mrp)
+```
+
+## Validación cruzada
+
+```{r}
+# Eta: Magnitud de las correciones que son hechas por cada predictor nuevo (learning rate)
+# max depth: profundidad de los árboles
+grid <- expand_grid(max_depth = seq(3, 6, 1), eta = seq(.2, .35, .01))
+y = encuesta_mrp[,7]
+encuesta_mrp_m <- xgb.DMatrix(data = as.matrix(sapply(encuesta_mrp[,-7], as.numeric)), label = as.matrix(sapply(y, as.numeric)))
+
+
+xgb_train_rmse <- numeric(nrow(grid))
+xgb_test_rmse <- numeric(nrow(grid))
+
+
+for(i in 1:nrow(grid)){
+  xgb_untuned = xgb.cv(
+    data = encuesta_mrp_m,
+    params = list(
+      objective = "reg:squarederror",
+      eta = grid$eta[i],
+      max_depth = grid$max_depth[i]
+    ),
+    nrounds = 100,
+    early_stopping_rounds = 3, # training with a validation set will stop if the performance does not improve for k rounds (3)
+    nfold = 5
+  )
+  
+  xgb_train_rmse[i] <-
+    xgb_untuned$evaluation_log$train_rmse_mean[xgb_untuned$best_iteration]
+  xgb_test_rmse[i] <-
+    xgb_untuned$evaluation_log$test_rmse_mean[xgb_untuned$best_iteration]
+  
+  cat(i, "\n")
+}
+```
+
+```{r}
+xgb_train_rmse <- xgb_train_rmse %>% 
+  tibble() %>% 
+  mutate(simulacion = seq(1:64))
+
+xgb_test_rmse <- xgb_test_rmse %>% 
+  tibble() %>% 
+  mutate(simulacion = seq(1:64))
+
+xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) + geom_line()
+
+saveRDS(xgb_train_rmse, file = "ingreso/output/xgb_train_rmse_geo.rds")
+
+grid[which.min(xgb_train_rmse$.), ]
+```
+
+max depth = 5
+eta = 0.23
+
+```{r}
+modelo1 <- xgboost(params = list(
+  objective = "reg:squarederror",
+  eta = 0.23,
+  max_depth = 5),
+  nrounds = 1000,
+  # early_stopping_rounds = 3,
+  data = encuesta_mrp_m
+)
+
+saveRDS(modelo1, file = "ingreso/output/modelo1.rds")
+
+ggplot(modelo1$evaluation_log, aes(
+  x = iter,
+  y = train_rmse
+)) + geom_line() + geom_vline(xintercept = 13.5, col = "red")
+
+
+modelo1$evaluation_log[which.min(modelo1$evaluation_log$train_rmse), ]
+
+modelo1$evaluation_log[13, ]
+modelo1$evaluation_log[14, ]
+
+```
+
+- Para este caso podemos observar que luego de 34 iteraciones el modelo se detuvo debido a que el modelo no mejoró luego de 34 por lo que ahí se detuvo. 
+- Por otro lado, se puede observar que luego de 14 iteraciones el modelo estabiliza el Error Cuadrático Medio.
+
+
+## importancia de variables
+
+```{r}
+importancia <- xgb.importance(
+  feature_names = names(encuesta_mrp[,-7]),
+  model = modelo1
+)
+
+p2 <- xgb.ggplot.importance(importancia)
+```
+
+# Modelo con solo las variables censales
+
+## Datos
+
+```{r}
+rm(list = ls())
+```
+
+
+```{r}
+encuesta_mrp <- readRDS("ingreso/datos/encuesta_mrp1.rds")
+```
+
+```{r}
+# Encuesta quitamos ingreso, lp, li y fep
+encuesta_mrp <- encuesta_mrp %>% 
+  select(
+    dam, area, ingreso,sexo, anoest, edad, discapacidad, 
+    tiene_alcantarillado, tiene_electricidad, tiene_acueducto,
+    tiene_gas, eliminar_basura, tiene_internet, piso_tierra,
+    material_paredes, material_techo, rezago_escolar, alfabeta,
+    hacinamiento, tasa_desocupacion
+  ) %>% 
+    mutate(
+  dam = recode(dam,
+               "01" = 1,
+               "02" = 2,
+               "03" = 3,
+               "04" = 4,
+               "05" = 5,
+               "06" = 6)) %>%
+  mutate_if(is.character, as.factor) %>% 
+  mutate(dam = as.factor(dam))
+
+summary(encuesta_mrp)
+```
+
+
+## Validación cruzada
+
+```{r}
+# Eta: Magnitud de las correciones que son hechas por cada predictor nuevo (learning rate)
+# max depth: profundidad de los árboles
+grid <- expand_grid(max_depth = seq(3, 6, 1), eta = seq(.2, .35, .01))
+y = encuesta_mrp[,3]
+encuesta_mrp_m <- xgb.DMatrix(data = as.matrix(sapply(encuesta_mrp[,-3], as.numeric)), label = as.matrix(sapply(y, as.numeric)))
+
+
+xgb_train_rmse <- numeric(nrow(grid))
+xgb_test_rmse <- numeric(nrow(grid))
+
+
+for(i in 1:nrow(grid)){
+  xgb_untuned = xgb.cv(
+    data = encuesta_mrp_m,
+    params = list(
+      objective = "reg:squarederror",
+      eta = grid$eta[i],
+      max_depth = grid$max_depth[i]
+    ),
+    nrounds = 100,
+    early_stopping_rounds = 3, # training with a validation set will stop if the performance does not improve for k rounds (3)
+    nfold = 5
+  )
+  
+  xgb_train_rmse[i] <-
+    xgb_untuned$evaluation_log$train_rmse_mean[xgb_untuned$best_iteration]
+  xgb_test_rmse[i] <-
+    xgb_untuned$evaluation_log$test_rmse_mean[xgb_untuned$best_iteration]
+  
+  cat(i, "\n")
+}
+```
+
+```{r}
+xgb_train_rmse <- xgb_train_rmse %>% 
+  tibble() %>% 
+  mutate(simulacion = seq(1:64))
+
+xgb_test_rmse <- xgb_test_rmse %>% 
+  tibble() %>% 
+  mutate(simulacion = seq(1:64))
+
+xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) + geom_line()
+
+grid[which.min(xgb_train_rmse$.), ]
+saveRDS(xgb_train_rmse, file = "ingreso/output/xgb_train_rmse_census.rds")
+```
+
+max depth = 6
+eta = 0.2
+
+```{r}
+modelo2 <- xgboost(params = list(
+  objective = "reg:squarederror",
+  eta = 0.2,
+  max_depth = 6),
+  nrounds = 1000,
+  # early_stopping_rounds = 3,
+  data = encuesta_mrp_m
+)
+
+saveRDS(modelo2, file = "ingreso/output/modelo2.rds")
+
+ggplot(modelo2$evaluation_log, aes(
+  x = iter,
+  y = train_rmse
+)) + geom_line() + geom_vline(xintercept = 104, col = "red")
+
+modelo2$evaluation_log[which.min(modelo2$evaluation_log$train_rmse), ]
+
+```
+
+- Para este caso podemos observar que luego de 927 iteraciones el modelo se detuvo debido a que el modelo no mejoró luego de 927 por lo que ahí se detuvo. 
+- Por otro lado, se puede observar que luego de 104 iteraciones el modelo estabiliza el Error Cuadrático Medio.
+
+
+## importancia de variables
+
+```{r}
+importancia <- xgb.importance(
+  feature_names = names(encuesta_mrp[,-7]),
+  model = modelo2
+)
+
+p3 <- xgb.ggplot.importance(importancia)
+```
+
+
+# Evaluación del RMSE para los tres modelos
+
+```{r}
+rm(list = ls())
+```
+
+```{r}
+modelo <- readRDS("ingreso/output/modelo.rds")
+modelo1 <- readRDS("ingreso/output/modelo1.rds") 
+modelo2 <- readRDS("ingreso/output/modelo2.rds")
+```
+
+```{r}
+
+modelos <- rbind(modelo$evaluation_log, modelo1$evaluation_log,
+                 modelo2$evaluation_log)
+
+modelos$mods <-  rep(c("todas cov","geo cov","censo cov"), each = 1000)
+```
+
+```{r}
+ggplot(modelos, aes(x = iter, y = train_rmse, col = mods)) + geom_line()
+
+ggplot(modelos, aes(x = iter, y = train_rmse, col = mods)) + geom_boxplot()
+```
+
++ De acá se puede observar que el modelo con solo las covariables geoespaciales no están brindando suficiente información al modelo, generando así un Error Cuadrático Medio mucho más alto que sus otros competidores. 
++ Por otro lado, la ganancia que hay con el modelo con todas las covariables es muy poca con respecto al modelo con solo las covariables del censo. 
+
+```{r}
+censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") %>% ungroup() %>% 
+  select(dam, area, sexo, anoest, edad, discapacidad,
+         F182013_stable_lights, X2016_crops.coverfraction,
+         X2016_urban.coverfraction, X2016_gHM, 
+         accessibility, accessibility_walking_only,
+         tiene_alcantarillado, tiene_electricidad,
+         tiene_acueducto, tiene_gas, eliminar_basura,
+         tiene_internet, piso_tierra,material_paredes,
+         material_techo, rezago_escolar, alfabeta,
+         hacinamiento,tasa_desocupacion
+         )
+```
+
+```{r}
+censo_mrp1 <- xgb.DMatrix(data = as.matrix(sapply(censo_mrp, as.numeric)))
+```
+
+```{r}
+pred <- predict(modelo, newdata = censo_mrp1)
+
+saveRDS(pred, file = "ingreso/output/pred.rds")
+
+censo_mrp$pred <- pred
+```
+
+```{r}
+importancia <- xgb.importance(
+  feature_names = names(encuesta_mrp[,-3]),
+  model = modelo
+)
+
+xgb.ggplot.importance(importancia)
+```
+
+
+
+
+
 

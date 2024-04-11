@@ -1,11 +1,12 @@
 from sklearn.ensemble import HistGradientBoostingRegressor
 from sklearn.model_selection import cross_val_score
+from sklearn.metrics import mean_squared_error
 import pandas as pd
 import pyreadr
 import numpy as np
-import polars as pl
 from itertools import product
-import plotly.express as px
+import matplotlib.pyplot as plt
+import openpyxl
 # De acuerdo a Poverty Mapping in the Age of Machine Learning se prueban tres 
 # modelos de XGBoost 
 
@@ -62,3 +63,27 @@ xgb_train_rmse = pd.DataFrame(xgb_train_rmse, columns= ['RMSE'])
 
 simulacion = pd.concat([ite, xgb_train_rmse], axis = 1)
 
+plt.plot(simulacion["ite"], simulacion["RMSE"])
+plt.xlabel("Iteración")
+plt.ylabel("RMSE")
+plt.show()
+
+simulacion.to_excel("./python/ingreso/output/simulacion1.xlsx")
+grid.iloc[np.argmin(xgb_train_rmse.values)]
+# Los parámetros sugeridos son max depth de 5 y un learning rate de 0.31
+
+modelo = HistGradientBoostingRegressor(
+    learning_rate=0.31,
+    max_iter = 1000,
+    max_depth = 5
+).fit(X, y)
+
+result = pyreadr.read_r("R/ingreso/datos/censo_mrp1.rds")
+print(result.keys())
+censo_mrp = result[None]
+
+censo_mrp.drop(columns = ["distrito", "area1", "sexo2", "edad2", "edad3",
+                          "edad4", "edad5", "anoest2", "anoest3", "anoest4",
+                          "discapacidad1", "etnia1"], inplace = True)
+
+pred = modelo.predict(censo_mrp)

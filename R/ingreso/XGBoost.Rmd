@@ -1,14 +1,19 @@
 ---
-output: html_document
+output: pdf_document
+title: Poverty Mapping in the Age of Machine Learning
+author: Marco Espinoza
+email: espinozamarco70@gmail.com
+organization: Comisión Económica para América Latina y el Caribe
+date: 02/05/2024
 editor_options: 
   chunk_output_type: console
 ---
 
-De acuerdo a *Poverty Mapping in the Age of Machine Learning* se prueban tres modelos de XGBoosting machines, los cuales son: 
+De acuerdo a *Poverty Mapping in the Age of Machine Learning* se prueban tres modelos de XGBoosting machines, los cuales son:
 
 -   Modelo XGBoost Machine con covariables de geoubicación únicamente.
 -   Modelo XGBoost Machine con covariables censales únicamente.
--   Con todos los modelos. 
+-   Modelo XGBoost Machine con todas las covariables.
 
 ```{r}
 rm(list = ls())
@@ -17,14 +22,15 @@ rm(list = ls())
 # Librerias
 
 ```{r}
-x <- c('tidyverse','xgboost')
+x <- c('tidyverse','xgboost','gridExtra')
 lapply(x, require, character.only = TRUE)
 ```
 
 ```{r}
 set.seed(1998)
-```
 
+options(scipen=999)
+```
 
 # Datos
 
@@ -58,7 +64,7 @@ summary(encuesta_mrp)
 
 ## Validación cruzada
 
-```{r}
+```{r, eval=FALSE}
 # Eta: Magnitud de las correciones que son hechas por cada predictor nuevo (learning rate)
 # max depth: profundidad de los árboles
 grid <- expand_grid(max_depth = seq(3, 6, 1), eta = seq(.2, .35, .01))
@@ -92,7 +98,7 @@ for(i in 1:nrow(grid)){
 }
 ```
 
-```{r}
+```{r, eval=FALSE}
 xgb_train_rmse <- xgb_train_rmse %>% 
   tibble() %>% 
   mutate(simulacion = seq(1:64))
@@ -110,12 +116,12 @@ saveRDS(xgb_train_rmse, file = "ingreso/output/xgb_train_rmse_all.rds")
 grid[which.min(xgb_train_rmse$.), ] 
 ```
 
-vamos a ajustar el modelo con los siguientes hiperparámetros: 
+vamos a ajustar el modelo con los siguientes hiperparámetros:
 
-max_depth = 6
-eta = 0.30
+- max_depth = 6 
+- eta = 0.30
 
-```{r}
+```{r, eval=FALSE}
 modelo <- xgboost(params = list(
   objective = "reg:squarederror",
   eta = 0.30,
@@ -138,12 +144,11 @@ modelo$evaluation_log[71, ]
 saveRDS(modelo, file = "ingreso/output/modelo.rds")
 ```
 
-- Podemos observar que en la creación de los árboles, luego de 71 iteraciones el Error Cuadrático Medio se estabiliza y tiene un cambio mínimo con respecto a la última iteración.
-
+-   Podemos observar que en la creación de los árboles, luego de 71 iteraciones el Error Cuadrático Medio se estabiliza y tiene un cambio mínimo con respecto a la última iteración.
 
 ## importancia de variables
 
-```{r}
+```{r, eval=FALSE}
 importancia <- xgb.importance(
   feature_names = names(encuesta_mrp[,-3]),
   model = modelo
@@ -227,8 +232,7 @@ saveRDS(xgb_train_rmse, file = "ingreso/output/xgb_train_rmse_geo.rds")
 grid[which.min(xgb_train_rmse$.), ]
 ```
 
-max depth = 5
-eta = 0.23
+max depth = 5 eta = 0.23
 
 ```{r}
 modelo1 <- xgboost(params = list(
@@ -255,9 +259,8 @@ modelo1$evaluation_log[14, ]
 
 ```
 
-- Para este caso podemos observar que luego de 34 iteraciones el modelo se detuvo debido a que el modelo no mejoró luego de 34 por lo que ahí se detuvo. 
-- Por otro lado, se puede observar que luego de 14 iteraciones el modelo estabiliza el Error Cuadrático Medio.
-
+-   Para este caso podemos observar que luego de 34 iteraciones el modelo se detuvo debido a que el modelo no mejoró luego de 34 por lo que ahí se detuvo.
+-   Por otro lado, se puede observar que luego de 14 iteraciones el modelo estabiliza el Error Cuadrático Medio.
 
 ## importancia de variables
 
@@ -278,12 +281,11 @@ p2 <- xgb.ggplot.importance(importancia)
 rm(list = ls())
 ```
 
-
-```{r}
+```{r, eval=FALSE}
 encuesta_mrp <- readRDS("ingreso/datos/encuesta_mrp1.rds")
 ```
 
-```{r}
+```{r, eval=FALSE}
 # Encuesta quitamos ingreso, lp, li y fep
 encuesta_mrp <- encuesta_mrp %>% 
   select(
@@ -307,10 +309,9 @@ encuesta_mrp <- encuesta_mrp %>%
 summary(encuesta_mrp)
 ```
 
-
 ## Validación cruzada
 
-```{r}
+```{r, eval=FALSE}
 # Eta: Magnitud de las correciones que son hechas por cada predictor nuevo (learning rate)
 # max depth: profundidad de los árboles
 grid <- expand_grid(max_depth = seq(3, 6, 1), eta = seq(.2, .35, .01))
@@ -344,7 +345,7 @@ for(i in 1:nrow(grid)){
 }
 ```
 
-```{r}
+```{r, eval=FALSE}
 xgb_train_rmse <- xgb_train_rmse %>% 
   tibble() %>% 
   mutate(simulacion = seq(1:64))
@@ -359,10 +360,10 @@ grid[which.min(xgb_train_rmse$.), ]
 saveRDS(xgb_train_rmse, file = "ingreso/output/xgb_train_rmse_census.rds")
 ```
 
-max depth = 6
-eta = 0.2
+ - max depth = 6 
+ - eta = 0.2
 
-```{r}
+```{r, eval=FALSE}
 modelo2 <- xgboost(params = list(
   objective = "reg:squarederror",
   eta = 0.2,
@@ -383,13 +384,12 @@ modelo2$evaluation_log[which.min(modelo2$evaluation_log$train_rmse), ]
 
 ```
 
-- Para este caso podemos observar que luego de 927 iteraciones el modelo se detuvo debido a que el modelo no mejoró luego de 927 por lo que ahí se detuvo. 
-- Por otro lado, se puede observar que luego de 104 iteraciones el modelo estabiliza el Error Cuadrático Medio.
-
+-   Para este caso podemos observar que luego de 927 iteraciones el modelo se detuvo debido a que el modelo no mejoró luego de 927 por lo que ahí se detuvo.
+-   Por otro lado, se puede observar que luego de 104 iteraciones el modelo estabiliza el Error Cuadrático Medio.
 
 ## importancia de variables
 
-```{r}
+```{r, eval=FALSE}
 importancia <- xgb.importance(
   feature_names = names(encuesta_mrp[,-7]),
   model = modelo2
@@ -397,7 +397,6 @@ importancia <- xgb.importance(
 
 p3 <- xgb.ggplot.importance(importancia)
 ```
-
 
 # Evaluación del RMSE para los tres modelos
 
@@ -420,13 +419,60 @@ modelos$mods <-  rep(c("todas cov","geo cov","censo cov"), each = 1000)
 ```
 
 ```{r}
-ggplot(modelos, aes(x = iter, y = train_rmse, col = mods)) + geom_line()
+p1 <- ggplot(modelos, aes(x = iter, y = train_rmse, col = mods)) + geom_line(linewidth = 1) + labs(color = "Modelo") + xlab(" ") + ylab(" ") + theme_classic() + scale_color_manual(values=c("#008194", "#C55A11","#FFC000"))
 
-ggplot(modelos, aes(x = iter, y = train_rmse, col = mods)) + geom_boxplot()
+p2 <- ggplot(modelos, aes(x = iter, y = train_rmse, col = mods)) + geom_boxplot() + labs(color = " ") + xlab(" ") + ylab(" ") + theme_classic() + scale_color_manual(values=c("#008194", "#C55A11","#FFC000"))
 ```
 
-+ De acá se puede observar que el modelo con solo las covariables geoespaciales no están brindando suficiente información al modelo, generando así un Error Cuadrático Medio mucho más alto que sus otros competidores. 
-+ Por otro lado, la ganancia que hay con el modelo con todas las covariables es muy poca con respecto al modelo con solo las covariables del censo. 
+
+```{r}
+grid.arrange(p1, p2, nrow = 2, left = "RMSE", bottom = "Iteración")
+```
+
+## Predicción con la encuesta
+
+```{r, eval=FALSE}
+pred <- predict(modelo, newdata = encuesta_mrp_m)
+
+saveRDS(pred, file = "ingreso/output/pred_encuesta.rds")
+```
+
+```{r}
+pred <- readRDS("ingreso/output/pred_encuesta.rds")
+
+encuesta_mrp$pred <- pred
+```
+
+```{r}
+matrix(c(mean(encuesta_mrp$ingreso, mean(encuesta_mrp$pred))),
+       ncol = 2, dimnames = list(" " = "media", "Estimación" = c("Encuesta", "Predicción") ))
+```
+
+```{r, eval=FALSE}
+ggplot(encuesta_mrp) + 
+  geom_histogram(aes(x = ingreso),stat = "density", adjust = 80, fill = "#C55A11",col = "#C55A11") +
+  geom_histogram(aes(x = pred), stat = "density", adjust = 80, fill = "#008194",col = "#008194", alpha = 0.3) +
+  theme_classic() 
+```
+
+```{r}
+ggplot(encuesta_mrp) + 
+  geom_histogram(aes(x = ingreso,fill = "Observados"), 
+                 bins = 30,
+                 color = "#C55A11",
+                 alpha = 0.5,
+                 size = 0.2) +
+  geom_histogram(aes(x = pred, fill = "Predichos"), 
+                 bins = 30,
+                 color = "#008194",
+                 alpha = 0.3,
+                 size = 0.2) +
+scale_fill_manual(values = c("#C55A11", "#008194")) +  labs(x = "Ingreso", y = " ", fill = "Valores") +
+  theme_classic()
+```
+
+-   De acá se puede observar que el modelo con solo las covariables geoespaciales no están brindando suficiente información al modelo, generando así un Error Cuadrático Medio mucho más alto que sus otros competidores.
+-   Por otro lado, la ganancia que hay con el modelo con todas las covariables es muy poca con respecto al modelo con solo las covariables del censo.
 
 ```{r}
 censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") %>% ungroup() %>% 
@@ -446,25 +492,45 @@ censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") %>% ungroup() %>%
 censo_mrp1 <- xgb.DMatrix(data = as.matrix(sapply(censo_mrp, as.numeric)))
 ```
 
-```{r}
+```{r, eval=FALSE}
 pred <- predict(modelo, newdata = censo_mrp1)
 
 saveRDS(pred, file = "ingreso/output/pred.rds")
+```
 
+```{r}
+pred <- readRDS("ingreso/output/pred.rds")
 censo_mrp$pred <- pred
 ```
 
 ```{r}
+matrix(c(mean(encuesta_mrp$ingreso), mean(censo_mrp$pred)),
+       ncol = 2, dimnames = list(" " = "media", "Estimación" = c("Encuesta", "Censo") ))
+```
+
+```{r}
+ggplot() +
+    geom_histogram(data = censo_mrp, aes(x = pred, fill = "Censo - predichos"),
+                 bins = 30,
+                 color = "#008194",
+                 alpha = 0.3,
+                 size = 0.2) +
+  geom_histogram(data = encuesta_mrp, aes(x = ingreso, fill = "Encuesta - observados"),
+                 bins = 30,
+                 color = "#C55A11",
+                 alpha = 0.5,
+                 size = 0.2) +
+  scale_fill_manual(values = c("#008194","#C55A11")) +  
+  labs(x = "Ingreso", y = " ", fill = "Valores") +
+  theme_classic()
+```
+
+
+```{r}
 importancia <- xgb.importance(
-  feature_names = names(encuesta_mrp[,-3]),
+  feature_names = names(encuesta_mrp[,-c(3,27)]),
   model = modelo
 )
 
 xgb.ggplot.importance(importancia)
 ```
-
-
-
-
-
-

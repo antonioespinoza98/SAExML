@@ -1,0 +1,14 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+rm(list = ls())
+```
+
+```{r}
+encuesta_mrp <- readRDS("ingreso/datos/encuesta_mrp1.rds")
+```
+

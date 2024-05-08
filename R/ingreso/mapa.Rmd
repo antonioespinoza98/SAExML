@@ -1,0 +1,128 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+# Mapa de ingreso medio para Costa Rica
+
+```{r}
+rm(list = ls())
+```
+
+
+# Librerias
+
+```{r}
+x <- c('tidyverse','sf','httr2','ows4R','rmapshaper','janitor')
+lapply(x, require, character.only = TRUE)
+```
+
+## Datos Cantonales
+
+```{r}
+url_wfs <- "https://geos.snitcr.go.cr/be/IGN_5_CO/wfs?"
+```
+
+```{r}
+bwk_client <- WFSClient$new(
+  url = url_wfs,
+  serviceVersion = "2.0.0"
+)
+
+as_tibble(bwk_client$getFeatureTypes(pretty = TRUE))
+```
+
+```{r}
+url <- url_parse(url_wfs)
+url$query <- list(
+  service = "wfs",
+  request = "GetFeature",
+  typename = "IGN_5_CO:limitecantonal_5k",
+  srsName = "EPSG:4326"
+  )
+request <- url_build(url) 
+
+regiones <- read_sf(request) |> 
+  select(
+    "CÓDIGO_DE_PROVINCIA",
+    "PROVINCIA","CÓDIGO_CANTÓN","CANTÓN"
+  )
+st_crs(regiones) <- st_crs(4326)
+```
+
+```{r}
+glimpse(regiones)
+```
+
+```{r}
+ggplot(
+  data = regiones
+) +
+  geom_sf(color = "white", fill = "#365486") +
+  theme_minimal()
+```
+
+```{r}
+regiones_simplificadas <- ms_simplify(
+  input = regiones,
+  keep = 0.05,
+  keep_shapes = FALSE
+)
+
+# eliminar la isla del coco
+regiones_simplificadas <- ms_filter_islands(
+  input = regiones_simplificadas,
+  min_area = 24000000
+)
+```
+
+```{r}
+write_sf(
+  obj = regiones_simplificadas, dsn = "ingreso/output/cantones_cr.geojson")
+```
+
+```{r}
+cantones <- st_read(
+  dsn = "ingreso/output/cantones_cr.geojson",
+  quiet = TRUE
+  ) |> 
+  clean_names()
+```
+
+```{r}
+cantones <- cantones |> 
+  select(
+    provincia, canton
+  )
+
+glimpse(cantones)
+```
+
+```{r}
+ingreso_cantonal <- readRDS("ingreso/output/ingreso_cantonal.rds")
+```
+
+```{r}
+anti_join(ingreso_cantonal, cantones, by = 'canton')
+```
+
+
+```{r}
+ggplot(
+  data = cantones
+) +
+  geom_sf(color = "white", fill = "#365486") +
+  theme_minimal()
+```
+
+
+
+
+
+
+
+
+
+
+

@@ -474,6 +474,7 @@ scale_fill_manual(values = c("#C55A11", "#008194")) +  labs(x = "Ingreso", y = "
 -   De acá se puede observar que el modelo con solo las covariables geoespaciales no están brindando suficiente información al modelo, generando así un Error Cuadrático Medio mucho más alto que sus otros competidores.
 -   Por otro lado, la ganancia que hay con el modelo con todas las covariables es muy poca con respecto al modelo con solo las covariables del censo.
 
+## Predicción con el censo
 ```{r}
 censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") %>% ungroup() %>% 
   select(dam, area, sexo, anoest, edad, discapacidad,

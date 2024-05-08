@@ -9,6 +9,60 @@ rm(list = ls())
 ```
 
 ```{r}
+x <- c('tidyverse','survey','srvyr')
+lapply(x, require, character.only = TRUE)
+```
+
+```{r}
 encuesta_mrp <- readRDS("ingreso/datos/encuesta_mrp1.rds")
 ```
+
+```{r}
+diseno <- encuesta_mrp %>% group_by(dam) %>% 
+  as_survey_design(weights = fep)
+```
+
+```{r}
+media_est_srvyr <- diseno %>% 
+  group_by(dam) %>% 
+  summarise(media_ingreso = mean(ingreso))
+```
+
+```{r}
+censo_mrp <- censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds")
+
+pred <- readRDS("ingreso/output/pred.rds")
+
+censo_mrp$pred_ingreso <- pred
+```
+
+```{r}
+ingreso_dam <- censo_mrp %>% 
+  group_by(dam) %>% 
+  summarise(
+    media_ingreso = mean(pred_ingreso)
+  )
+```
+
+
+```{r}
+
+mapping <- rbind(media_est_srvyr, ingreso_dam)
+
+estim <- c(rep("Directo", 6), rep("XGBoost", 6))
+
+mapping <- cbind(mapping, estim)
+```
+
+```{r}
+mapping %>% 
+  ggplot(
+    aes(x = dam,
+        y = media_ingreso,
+        col = estim)
+  ) + geom_point()
+```
+
+
+
 

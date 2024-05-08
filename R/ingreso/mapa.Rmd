@@ -87,8 +87,9 @@ cantones <- st_read(
   dsn = "ingreso/output/cantones_cr.geojson",
   quiet = TRUE
   ) |> 
-  clean_names()
+  clean_names()  %>% filter(! canton %in% c("Monteverde","Río Cuarto","Puerto Jiménez"))
 ```
+
 
 ```{r}
 cantones <- cantones |> 
@@ -104,22 +105,25 @@ ingreso_cantonal <- readRDS("ingreso/output/ingreso_cantonal.rds")
 ```
 
 ```{r}
-anti_join(ingreso_cantonal, cantones, by = 'canton')
-```
+mapa <- left_join(
+  x = cantones,
+  y = ingreso_cantonal,
+  by = join_by(canton == canton)
+)
 
+glimpse(mapa)
+```
 
 ```{r}
 ggplot(
-  data = cantones
+  data = mapa,
+  mapping = aes(
+    fill = ingreso_medio
+  )
 ) +
-  geom_sf(color = "white", fill = "#365486") +
+  geom_sf(color = "white") +
   theme_minimal()
 ```
-
-
-
-
-
 
 
 

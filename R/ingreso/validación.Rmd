@@ -4,6 +4,12 @@ editor_options:
   chunk_output_type: console
 ---
 
+Autor: Marco Espinoza
+CEPAL - División de Estadística
+fecha: mayo - 2024
+
+
+
 ```{r}
 rm(list = ls())
 ```
@@ -55,14 +61,29 @@ mapping <- cbind(mapping, estim)
 ```
 
 ```{r}
-mapping %>% 
+plot_validacion <- mapping %>% 
   ggplot(
     aes(x = dam,
         y = media_ingreso,
         col = estim)
-  ) + geom_point()
+  ) + geom_point(size = 2) + theme_minimal() +
+    scale_color_manual(values = c("red","green")) +  
+  labs(x = "Dam", y = "Ingreso medio", fill = "Modelo")
+```
+
+```{r}
+ggsave(plot_validacion, filename = "ingreso/output/validacion.png")
 ```
 
 
+
+
+```{r}
+censo_mrp %>%
+  group_by(dam) %>% 
+  summarise(
+  n = n()
+)
+```
 
 

@@ -456,7 +456,7 @@ ggplot(encuesta_mrp) +
 ```
 
 ```{r}
-ggplot(encuesta_mrp) + 
+pred_encuesta <- ggplot(encuesta_mrp) + 
   geom_histogram(aes(x = ingreso,fill = "Observados"), 
                  bins = 30,
                  color = "#C55A11",
@@ -468,8 +468,14 @@ ggplot(encuesta_mrp) +
                  alpha = 0.3,
                  size = 0.2) +
 scale_fill_manual(values = c("#C55A11", "#008194")) +  labs(x = "Ingreso", y = " ", fill = "Valores") +
+  xlim(0, 2500000) +
   theme_classic()
 ```
+
+```{r, eval=FALSE}
+ggsave(pred_encuesta, filename = "ingreso/output/encuesta.png")
+```
+
 
 -   De acá se puede observar que el modelo con solo las covariables geoespaciales no están brindando suficiente información al modelo, generando así un Error Cuadrático Medio mucho más alto que sus otros competidores.
 -   Por otro lado, la ganancia que hay con el modelo con todas las covariables es muy poca con respecto al modelo con solo las covariables del censo.

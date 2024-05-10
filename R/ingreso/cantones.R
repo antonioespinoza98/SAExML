@@ -1,9 +1,13 @@
+# ------------------------------------
+# autor: Marco Espinoza
+# CEPAL - División de Estadística
+# fecha: Mayo 2024
+# ------------------------------------
 # Limpieza de los datos
 
 rm(list = ls())
 
 # Debemos codificar los cantones en base a los distritos
-
 san_jose <- c("10101","10102","10103","10104","10105","10106","10107",
               "10108","10109","10110","10111")
 escazu <- c("10201","10202","10203")
@@ -92,6 +96,10 @@ siquirres <- c("70301", "70302", "70303", "70304", "70305", "70306", "70307")
 talamanca <- c("70401", "70402", "70403", "70404")
 matina <- c("70501", "70502", "70503")
 guacimo <- c("70601", "70602", "70603", "70604", "70605")
+
+
+# Extraemos el censo y de una vez creamos una columna nueva llamada 
+# canton, donde se crean los cantones en base a los distritos
 
 censo_mrp <- censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") %>% 
   mutate(
@@ -185,18 +193,51 @@ censo_mrp <- censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") %>%
       )
   )
 
+# Cargamos la predicción realizada en el archivo de XGBoost.Rmd
 pred <- readRDS("ingreso/output/pred.rds")
-
+# se lo agregamos al data frame del censo
 censo_mrp$pred_ingreso <- pred
 
+# Creamos una base de datos resumen para el ingreso medio para cada uno 
+# de los 81 cantones existentes en el censo 2011. 
 ingreso_cantonal <- censo_mrp %>% 
   group_by(canton) %>% 
   summarise(
     ingreso_medio = mean(pred_ingreso)
   )
 
+# ---------------------------------------------------------
+# BASE RESUMEN PARA LAS REGIONES DE PLANIFICACIÓN ECONÓMICA 
+# DE ACUERDO AL MIDEPLAN
+# ---------------------------------------------------------
 
-saveRDS(ingreso_cantonal, "ingreso/output/ingreso_cantonal.rds")
+# Creamos una columna nueva donde recodificamos el DAM y le llamamos
+# código. Esto se hace debido a que para poder realizar el mapa
+# se hace un left join con el shapefile, por lo tanto el nombre de la 
+#columna en común debe ser igual a la del otro archivo. 
+# para evitar recodings, se hace desde acá.
+censo_mrp <- censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") %>% 
+  mutate(
+  codigo = recode(dam,
+               "01" = 1,
+               "02" = 2,
+               "03" = 3,
+               "04" = 4,
+               "05" = 5,
+               "06" = 6))
+# volvemos a cargar la predicción y se la agregamos a la base del censo  
+pred <- readRDS("ingreso/output/pred.rds")
+censo_mrp$pred_ingreso <- pred
+
+# Creamos una base de datos resumen para las regiones de planificación
+ingreso_region <- censo_mrp %>% 
+  group_by(codigo) %>% 
+  summarise(
+    ingreso_medio = mean(pred_ingreso)
+  )
+
+
+saveRDS(ingreso_region, "ingreso/output/ingreso_region.rds")
 
 
 

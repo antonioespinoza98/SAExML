@@ -4,6 +4,12 @@ editor_options:
   chunk_output_type: console
 ---
 
+Autor: Marco Espinoza
+CEPAL - División de Estadística
+fecha: mayo - 2024
+
+
+
 # Mapa de ingreso medio para Costa Rica
 
 ```{r}
@@ -18,13 +24,20 @@ x <- c('tidyverse','sf','httr2','ows4R','rmapshaper','janitor')
 lapply(x, require, character.only = TRUE)
 ```
 
-## Datos Cantonales
+# Extracción de información geoespacial
+
+Nota: Este código es ilustrativo. Ya que el archivo final está guardado en la carpeta *output* con el nombre de: `cantones_cr.geojson` 
+
+Para más información, revisar la siguiente [página](https://www.snitcr.go.cr/ico_servicios_ogc_info?k=bm9kbzo6OTM=&nombre=IGN%20Cartograf%C3%ADa%201:5mil%20CO)
+
 
 ```{r}
+# Link dado por el SNIT de Costa Rica 
 url_wfs <- "https://geos.snitcr.go.cr/be/IGN_5_CO/wfs?"
 ```
 
 ```{r}
+# Aquí se crea la conexión
 bwk_client <- WFSClient$new(
   url = url_wfs,
   serviceVersion = "2.0.0"
@@ -34,6 +47,8 @@ as_tibble(bwk_client$getFeatureTypes(pretty = TRUE))
 ```
 
 ```{r}
+# En esta parte del código se hace el GET request de la información
+# En este caso nos interesa extraer la provincia y el cantón.
 url <- url_parse(url_wfs)
 url$query <- list(
   service = "wfs",
@@ -63,6 +78,8 @@ ggplot(
   theme_minimal()
 ```
 
+El siguiente código lo que produce es la simplificación de la regiones y el mapa. Esto quiere decir que se reduce las dimensiones para poder apreciar de mejor manera el mapa. Además de esto, también se reduce su tamaño computacionalmente. Aquí estamos quitando la Isla del Coco. 
+
 ```{r}
 regiones_simplificadas <- ms_simplify(
   input = regiones,
@@ -77,10 +94,18 @@ regiones_simplificadas <- ms_filter_islands(
 )
 ```
 
+Una vez, guardamos el archivo para el nivel cantonal. Este archivo es el final y es el que se debe utilizar. 
+
 ```{r}
 write_sf(
   obj = regiones_simplificadas, dsn = "ingreso/output/cantones_cr.geojson")
 ```
+
+# Mapa para los cantones de Costa Rica
+
+leemos el archivo recién creado.
+
+*NOTA:* También estamos quitando a los cantones de Monterverde, Río Cuarto y Puerto Jimenez. Esto se debe a que para el censo del 2011 estos cantones aún no existian dado que se crearon en años posteriores. 
 
 ```{r}
 cantones <- st_read(
@@ -100,9 +125,13 @@ cantones <- cantones |>
 glimpse(cantones)
 ```
 
+Leemos la base resumen del ingreso cantonal
+
 ```{r}
 ingreso_cantonal <- readRDS("ingreso/output/ingreso_cantonal.rds")
 ```
+
+Unimos las dos bases de datos
 
 ```{r}
 mapa <- left_join(
@@ -115,17 +144,103 @@ glimpse(mapa)
 ```
 
 ```{r}
-ggplot(
+mapa_plot <- ggplot(
   data = mapa,
   mapping = aes(
     fill = ingreso_medio
   )
 ) +
   geom_sf(color = "white") +
+  labs(fill = "Ingreso medio") +
+  scale_fill_viridis_c() +
   theme_minimal()
 ```
 
+```{r}
+ggsave(mapa_plot, filename = "ingreso/output/mapa_cantonal.png")
+```
 
+# Mapa para las regiones de planificación
+
+```{r}
+rm(list = ls())
+```
+
+```{r}
+shp = read_sf("ingreso/datos/mideplan_CR.shp")
+```
+
+```{r}
+glimpse(shp)
+```
+
+```{r}
+ggplot(
+  data = shp) +
+  geom_sf(color = "white", fill = "#365486") +
+  theme_minimal()
+```
+
+```{r}
+regiones_simplificadas <- ms_simplify(
+  input = shp,
+  keep = 0.05,
+  keep_shapes = FALSE
+)
+
+# eliminar la isla del coco
+regiones_simplificadas <- ms_filter_islands(
+  input = regiones_simplificadas,
+  min_area = 24000000
+)
+```
+
+```{r}
+write_sf(
+  obj = regiones_simplificadas, dsn = "MIDEPLAN_cr.geojson")
+```
+
+```{r}
+mideplan <- st_read("MIDEPLAN_cr.geojson", quiet = TRUE)
+```
+
+```{r}
+ggplot(
+  data = mideplan
+) +
+  geom_sf(color = "white", fill = "#365486") +
+  theme_minimal()
+```
+
+```{r}
+ingreso_region <- readRDS("ingreso/output/ingreso_region.rds")
+```
+
+```{r}
+mapping <- left_join(
+  x = mideplan,
+  y = ingreso_region,
+  by = join_by(codigo == codigo)
+)
+```
+
+```{r}
+
+region_plot <- ggplot(
+  data = mapping,
+  mapping = aes(
+    fill = ingreso_medio
+  )
+) +
+  geom_sf(color = "white") +
+  labs(fill = "Ingreso medio") +
+  scale_fill_viridis_c() +
+  theme_minimal()
+```
+
+```{r}
+ggsave(region_plot, filename = "ingreso/output/mapa_mideplan.png")
+```
 
 
 

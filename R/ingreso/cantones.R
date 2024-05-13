@@ -218,20 +218,20 @@ ingreso_cantonal <- censo_mrp %>%
 # para evitar recodings, se hace desde acá.
 censo_mrp <- censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") %>% 
   mutate(
-  codigo = recode(dam,
-               "01" = 1,
-               "02" = 2,
-               "03" = 3,
-               "04" = 4,
-               "05" = 5,
-               "06" = 6))
+  region = recode(dam,
+               "01" = "Central",
+               "02" = "Chorotega",
+               "03" = "Pacífico Central",
+               "04" = "Brunca",
+               "05" = "Huetar Caribe",
+               "06" = "Huetar Norte"))
 # volvemos a cargar la predicción y se la agregamos a la base del censo  
 pred <- readRDS("ingreso/output/pred.rds")
 censo_mrp$pred_ingreso <- pred
 
 # Creamos una base de datos resumen para las regiones de planificación
 ingreso_region <- censo_mrp %>% 
-  group_by(codigo) %>% 
+  group_by(region) %>% 
   summarise(
     ingreso_medio = mean(pred_ingreso)
   )

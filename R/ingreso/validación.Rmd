@@ -31,7 +31,7 @@ encuesta_mrp <- readRDS("ingreso/datos/encuesta_mrp1.rds") %>%
 ```
 
 ```{r}
-diseno <- encuesta_mrp %>% group_by(dam) %>% 
+diseno <- encuesta_mrp  %>% 
   as_survey_design(weights = fep)
 ```
 
@@ -42,25 +42,36 @@ media_est_srvyr <- diseno %>%
 ```
 
 ```{r}
-censo_mrp <- censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds")
+censo_mrp <- censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") %>% 
+      mutate(
+  region = recode(dam,
+               "01" = "Central",
+               "02" = "Chorotega",
+               "03" = "Pacífico Central",
+               "04" = "Brunca",
+               "05" = "Huetar Caribe",
+               "06" = "Huetar Norte")) %>% 
+  mutate(region = as.factor(region))
 
-pred <- readRDS("ingreso/output/pred2.rds")
+
+pred <- readRDS("ingreso/output/pred.rds")
 
 censo_mrp$pred_ingreso <- pred
 ```
 
 ```{r}
 ingreso_dam <- censo_mrp %>% 
-  group_by(dam) %>% 
+  group_by(region) %>% 
   summarise(
     media_ingreso = mean(pred_ingreso)
-  )
+  ) 
 ```
 
 
 ```{r}
 
-mapping <- rbind(media_est_srvyr, ingreso_dam)
+colnames(ingreso_dam) <- c("Domain", "Direct")
+mapping <- rbind(DIR[,c(1,3)], ingreso_dam)
 
 estim <- c(rep("Directo", 6), rep("XGBoost", 6))
 
@@ -70,8 +81,8 @@ mapping <- cbind(mapping, estim)
 ```{r}
 plot_validacion <- mapping %>% 
   ggplot(
-    aes(x = dam,
-        y = media_ingreso,
+    aes(x = Domain,
+        y = Direct,
         col = estim)
   ) + geom_point(size = 2) + theme_minimal() +
     scale_color_manual(values = c("red","green")) +  
@@ -89,8 +100,103 @@ ggsave(plot_validacion, filename = "ingreso/output/validacion.png")
 censo_mrp %>%
   group_by(dam) %>% 
   summarise(
-  n = n()
+  media_ingreso = mean(pred_ingreso)
 )
 ```
+
+```{r}
+encuesta_mrp %>% 
+  group_by(dam) %>% 
+  summarise(
+    media_ingreso = mean(ingreso)
+  )
+```
+
+```{r}
+encuesta_mrp <- readRDS("ingreso/datos/encuesta_mrp1.rds") %>% 
+  dplyr::select(
+    # -X2016_crops.coverfraction, -X2016_urban.coverfraction,
+    #      -X2016_gHM, -accessibility, -accessibility_walking_only,
+         -area1, -sexo2,-edad2,-edad3, -edad4,-edad5,-anoest2,
+         -anoest3, -anoest4, -discapacidad1,-etnia1,-lp,-li,-pobreza) %>% 
+  mutate_if(is.character, as.factor) %>% 
+  mutate(dam = as.factor(dam)) %>% 
+      mutate(
+  region = recode(dam,
+               "01" = "Central",
+               "02" = "Chorotega",
+               "03" = "Pacífico Central",
+               "04" = "Brunca",
+               "05" = "Huetar Caribe",
+               "06" = "Huetar Norte")) %>% 
+  mutate(region = as.factor(region))
+
+encuesta_mrp <- as.data.frame(encuesta_mrp)
+
+popsize <- encuesta_mrp %>% group_by(region) %>% 
+  summarise(n = n())
+
+popsize <- as.data.frame(popsize)
+
+encuesta_mrp$fep <- as.numeric(encuesta_mrp$fep)
+
+DIR <- direct(y = encuesta_mrp$ingreso, dom = encuesta_mrp$region,
+              sweight = encuesta_mrp$fep, domsize = popsize)
+
+```
+
+
+
+
+```{r}
+library(sae)
+
+encuesta_agg <- readRDS("ingreso/datos/encuesta_df_agg.rds") %>% 
+    mutate(
+  region = recode(dam,
+               "01" = "Central",
+               "02" = "Chorotega",
+               "03" = "Pacífico Central",
+               "04" = "Brunca",
+               "05" = "Huetar Caribe",
+               "06" = "Huetar Norte")) %>% 
+  mutate(region = as.factor(region))
+
+encuesta_agg <- as.data.frame(encuesta_agg)
+
+popsize <- encuesta_agg %>% group_by(region) %>% 
+  summarise(n = sum(n))
+popsize <- as.data.frame(popsize)
+encuesta_agg$fep <- as.numeric(encuesta_agg$fep)
+
+DIR <- direct(y = encuesta_agg$ingreso, dom = encuesta_agg$region,
+              sweight = encuesta_agg$fep, domsize = popsize)
+DIR
+```
+
+```{r}
+data("incomedata")
+data("sizeprov")
+
+Popn <- sizeprov[, c("provlab", "Nd")]
+incomedata %>% group_by(provlab) %>% summarise(n = n())
+DIR <- direct(y = incomedata$income, dom = incomedata$provlab,
+              sweight = incomedata$weight, domsize = Popn)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 

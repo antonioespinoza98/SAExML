@@ -30,113 +30,11 @@ Nota: Este código es ilustrativo. Ya que el archivo final está guardado en la 
 
 Para más información, revisar la siguiente [página](https://www.snitcr.go.cr/ico_servicios_ogc_info?k=bm9kbzo6OTM=&nombre=IGN%20Cartograf%C3%ADa%201:5mil%20CO)
 
-
-```{r}
-# Link dado por el SNIT de Costa Rica 
-url_wfs <- "https://geos.snitcr.go.cr/be/IGN_5_CO/wfs?"
-```
-
-```{r}
-# Aquí se crea la conexión
-bwk_client <- WFSClient$new(
-  url = url_wfs,
-  serviceVersion = "2.0.0"
-)
-
-as_tibble(bwk_client$getFeatureTypes(pretty = TRUE))
-```
-
-```{r}
-# En esta parte del código se hace el GET request de la información
-# En este caso nos interesa extraer la provincia y el cantón.
-url <- url_parse(url_wfs)
-url$query <- list(
-  service = "wfs",
-  request = "GetFeature",
-  typename = "IGN_5_CO:limitecantonal_5k",
-  srsName = "EPSG:4326"
-)
-request <- url_build(url)
-
-regiones <- read_sf(request) |>
-  select("CÓDIGO_CANTÓN", "PROVINCIA", "CANTÓN")
-st_crs(regiones) <- st_crs(4326)
-```
-
-```{r}
-glimpse(regiones)
-```
-
-```{r}
-ggplot(
-  data = regiones
-) +
-  geom_sf(color = "white", fill = "#365486") +
-  theme_minimal()
-```
-
-El siguiente código lo que produce es la simplificación de la regiones y el mapa. Esto quiere decir que se reduce las dimensiones para poder apreciar de mejor manera el mapa. Además de esto, también se reduce su tamaño computacionalmente. Aquí estamos quitando la Isla del Coco. 
-
-```{r}
-regiones_simplificadas <- ms_simplify(
-  input = regiones,
-  keep = 0.05,
-  keep_shapes = FALSE
-)
-
-# eliminar la isla del coco
-regiones_simplificadas <- ms_filter_islands(
-  input = regiones_simplificadas,
-  min_area = 24000000
-)
-```
-
-Una vez, guardamos el archivo para el nivel cantonal. Este archivo es el final y es el que se debe utilizar. 
-
-```{r}
-write_sf(
-  obj = regiones_simplificadas, dsn = "ingreso/output/cantones_cr.geojson")
-```
-
 # Mapa para los cantones de Costa Rica
 
-leemos el archivo recién creado.
-
-*NOTA:* También estamos quitando a los cantones de Monterverde, Río Cuarto y Puerto Jimenez. Esto se debe a que para el censo del 2011 estos cantones aún no existian dado que se crearon en años posteriores. 
-
 ```{r}
-cantones <- st_read("ingreso/output/cantones_cr.geojson", quiet = TRUE)
-cantones <- janitor::clean_names(cantones)
-
-
-
-cantones <- cantones |> 
-  mutate(
-    canton = case_match(
-      canton,
-      "Puerto Jiménez" ~ "Golfito",
-      "Monteverde" ~ "Puntarenas",
-      "Río Cuarto" ~ "Grecia",
-      .default = canton
-    ),
-    codigo_canton = case_match(
-      canton,
-      "613" ~ "607",
-      "612" ~ "601",
-      "216" ~ "203",
-      .default = canton
-    )
-  )
-
-cantones <- cantones |> 
-  summarise(
-    geometry = st_union(geometry),
-    .by = c(codigo_canton,provincia, canton)
-  )
-
-write_sf(obj = cantones, dsn = "ingreso/datos/cantones_ajustado_cr.geojson")
+cantones <- st_read("ingreso/output/cantones_ajustado_cr.geojson", quiet = TRUE)
 ```
-
 
 Leemos la base resumen del ingreso cantonal
 
@@ -180,54 +78,7 @@ rm(list = ls())
 ```
 
 ```{r}
-url_wfs <- "https://geos.snitcr.go.cr/be/IGN_5_CO/wfs?"
-
-url <- url_parse(url_wfs)
-url$query <- list(
-  service = "wfs",
-  request = "GetFeature",
-  typename = "IGN_5_CO:limitedistrital_5k",
-  srsName = "EPSG:4326"
-)
-request <- url_build(url)
-
-regiones <- read_sf(request) |>
-  select("CÓDIGO_DTA", "PROVINCIA", "CANTÓN", "DISTRITO", "REGIÓN")
-st_crs(regiones) <- st_crs(4326)
-```
-
-
-```{r}
-regiones_simplificadas <- ms_simplify(input = regiones,
-                                      keep = 0.05,
-                                      keep_shapes = FALSE)
-
-# eliminar la isla del coco
-regiones_simplificadas <- ms_filter_islands(input = regiones_simplificadas, min_area = 24000000)
-write_sf(obj = regiones_simplificadas, dsn = "ingreso/datos/distritos_cr.geojson")
-```
-
-```{r}
-distritos <- st_read("ingreso/datos/distritos_cr.geojson", quiet = TRUE)
-distritos <- janitor::clean_names(distritos)
-
-res <- distritos |>
-  summarise(geometry = st_union(geometry), .by = region)
-
-write_sf(obj = res, dsn = "ingreso/datos/regiones_cr.geojson")
-```
-
-
-```{r}
-regiones <- st_read("ingreso/datos/regiones_cr.geojson")
-```
-
-
-```{r}
-ggplot(
-  data = regiones) +
-  geom_sf(color = "white", fill = "#365486") +
-  theme_minimal()
+regiones <- st_read("ingreso/output/regiones_cr.geojson")
 ```
 
 ```{r}
@@ -243,7 +94,6 @@ mapping <- left_join(
 ```
 
 ```{r}
-
 region_plot <- ggplot(
   data = mapping,
   mapping = aes(
@@ -259,6 +109,40 @@ region_plot <- ggplot(
 ```{r}
 ggsave(region_plot, filename = "ingreso/output/mapa_mideplan.png")
 ```
+
+# Mapa distrital
+
+```{r}
+distritos <- st_read("ingreso/output/distritos_cr.geojson") %>% 
+  janitor::clean_names() 
+```
+
+```{r}
+ingreso_dist <- readRDS("ingreso/output/ingreso_distrital.rds") %>% 
+  mutate(distrito = as.numeric(distrito))
+```
+
+```{r}
+mapping <- left_join(
+  x = distritos,
+  y = ingreso_dist,
+  by = join_by(codigo_dta == distrito)
+)
+```
+
+```{r}
+ggplot(
+  data = mapping,
+  mapping = aes(
+    fill = media_ingreso
+  )
+) +
+  geom_sf(color = "white") +
+  labs(fill = "Ingreso medio") +
+  scale_fill_viridis_c() +
+  theme_minimal()
+```
+
 
 
 

@@ -44,18 +44,18 @@ encuesta_mrp <- encuesta_mrp %>%
   select(
     # -X2016_crops.coverfraction, -X2016_urban.coverfraction,
     #      -X2016_gHM, -accessibility, -accessibility_walking_only,
-         -area1, -sexo2,-edad2,-edad3, -edad4,-edad5,-anoest2,
+         -dam,-area1, -sexo2,-edad2,-edad3, -edad4,-edad5,-anoest2,
          -anoest3, -anoest4, -discapacidad1,-etnia1,-lp,-li,-fep,-pobreza) %>% 
-    mutate(
-  dam = recode(dam,
-               "01" = 1,
-               "02" = 2,
-               "03" = 3,
-               "04" = 4,
-               "05" = 5,
-               "06" = 6)) %>%
-  mutate_if(is.character, as.factor) %>% 
-  mutate(dam = as.factor(dam))
+    # mutate(
+  # dam = recode(dam,
+  #              "01" = 1,
+  #              "02" = 2,
+  #              "03" = 3,
+  #              "04" = 4,
+  #              "05" = 5,
+  #              "06" = 6)) %>%
+  mutate_if(is.character, as.factor)
+  # mutate(dam = as.factor(dam))
 
 summary(encuesta_mrp)
 ```
@@ -68,8 +68,8 @@ summary(encuesta_mrp)
 # Eta: Magnitud de las correciones que son hechas por cada predictor nuevo (learning rate)
 # max depth: profundidad de los árboles
 grid <- expand_grid(max_depth = seq(3, 6, 1), eta = seq(.2, .35, .01))
-y = encuesta_mrp[,3]
-encuesta_mrp_m <- xgb.DMatrix(data = as.matrix(sapply(encuesta_mrp[,-3], as.numeric)), label = as.matrix(sapply(y, as.numeric)))
+y = encuesta_mrp[,2]
+encuesta_mrp_m <- xgb.DMatrix(data = as.matrix(sapply(encuesta_mrp[,-2], as.numeric)), label = as.matrix(sapply(y, as.numeric)))
 
 
 xgb_train_rmse <- numeric(nrow(grid))
@@ -84,7 +84,7 @@ for(i in 1:nrow(grid)){
       eta = grid$eta[i],
       max_depth = grid$max_depth[i]
     ),
-    nrounds = 100,
+    nrounds = 1000,
     early_stopping_rounds = 3, # training with a validation set will stop if the performance does not improve for k rounds (3)
     nfold = 5
   )
@@ -483,7 +483,7 @@ ggsave(pred_encuesta, filename = "ingreso/output/encuesta.png")
 ## Predicción con el censo
 ```{r}
 censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") %>% ungroup() %>% 
-  select(dam, area, sexo, anoest, edad, discapacidad,
+  select( area, sexo, anoest, edad, discapacidad,
          F182013_stable_lights, X2016_crops.coverfraction,
          X2016_urban.coverfraction, X2016_gHM, 
          accessibility, accessibility_walking_only,

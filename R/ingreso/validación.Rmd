@@ -66,7 +66,7 @@ censo_mrp <- censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") %>%
   mutate(region = as.factor(region))
 
 
-pred <- readRDS("ingreso/output/pred.rds")
+# pred <- readRDS("ingreso/output/pred.rds")
 
 censo_mrp$pred_ingreso <- pred
 ```
@@ -96,7 +96,7 @@ plot_validacion <- mapping %>%
         col = estim)
   ) + geom_point(size = 2) + theme_minimal() +
     scale_color_manual(values = c("red","green")) +  
-  labs(x = "Dam", y = "Ingreso medio", fill = "Modelo")
+  labs(x = "Región de planificación", y = "Ingreso medio", fill = "Modelo") + ylim(0, 400000)
 ```
 
 ```{r}
@@ -118,4 +118,33 @@ encuesta_mrp %>%
     media_ingreso = mean(ingreso)
   )
 ```
+
+
+```{r}
+encuesta_mrp %>% 
+  group_by(edad) %>% 
+  filter(edad == 1) %>% 
+  select(edad, region, ingreso) %>% 
+  summarise(n = n())
+```
+
+
+```{r}
+prueba = subset(encuesta_mrp, edad == 1)
+
+table(prueba$ingreso)
+```
+
+
+```{r}
+encuesta_mrp %>% 
+  filter(ingreso == 0) %>% 
+  group_by(region) %>% 
+  summarise(n = n())
+
+```
+
+
+
+
 

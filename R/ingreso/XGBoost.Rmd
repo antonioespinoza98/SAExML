@@ -22,7 +22,7 @@ rm(list = ls())
 # Librerias
 
 ```{r}
-x <- c('tidyverse','xgboost','gridExtra')
+x <- c('tidyverse','xgboost','gridExtra','caTools')
 lapply(x, require, character.only = TRUE)
 ```
 
@@ -35,12 +35,8 @@ options(scipen=999)
 # Datos
 
 ```{r}
-encuesta_mrp <- readRDS("ingreso/datos/encuesta_mrp1.rds")
-```
-
-```{r}
 # Encuesta quitamos ingreso, lp, li y fep
-encuesta_mrp <- encuesta_mrp %>% 
+encuesta_mrp <- readRDS("ingreso/datos/encuesta_mrp1.rds") %>% 
   select(
     # -X2016_crops.coverfraction, -X2016_urban.coverfraction,
     #      -X2016_gHM, -accessibility, -accessibility_walking_only,
@@ -53,9 +49,8 @@ encuesta_mrp <- encuesta_mrp %>%
   #              "03" = 3,
   #              "04" = 4,
   #              "05" = 5,
-  #              "06" = 6)) %>%
+  #              "06" = 6)) 
   mutate_if(is.character, as.factor)
-  # mutate(dam = as.factor(dam))
 
 summary(encuesta_mrp)
 ```
@@ -64,12 +59,20 @@ summary(encuesta_mrp)
 
 ## Validación cruzada
 
+
+```{r}
+split <- sample.split(encuesta_mrp$ingreso, SplitRatio = 0.8)
+train <- encuesta_mrp[split, ]
+test <- encuesta_mrp[!split, ]
+```
+
+
 ```{r, eval=FALSE}
 # Eta: Magnitud de las correciones que son hechas por cada predictor nuevo (learning rate)
 # max depth: profundidad de los árboles
-grid <- expand_grid(max_depth = seq(3, 6, 1), eta = seq(.2, .35, .01))
-y = encuesta_mrp[,2]
-encuesta_mrp_m <- xgb.DMatrix(data = as.matrix(sapply(encuesta_mrp[,-2], as.numeric)), label = as.matrix(sapply(y, as.numeric)))
+grid <- expand_grid(max_depth = seq(3, 15, 1), eta = seq(.2, .35, .01))
+y = train[,2]
+encuesta_mrp_m <- xgb.DMatrix(data = as.matrix(sapply(train[,-2], as.numeric)), label = as.matrix(sapply(y, as.numeric)))
 
 
 xgb_train_rmse <- numeric(nrow(grid))
@@ -101,16 +104,20 @@ for(i in 1:nrow(grid)){
 ```{r, eval=FALSE}
 xgb_train_rmse <- xgb_train_rmse %>% 
   tibble() %>% 
-  mutate(simulacion = seq(1:64))
+  mutate(simulacion = seq(1:208))
 
 xgb_test_rmse <- xgb_test_rmse %>% 
   tibble() %>% 
-  mutate(simulacion = seq(1:64))
+  mutate(simulacion = seq(1:208))
 
-xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) + geom_line()
+xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) + 
+  geom_line() + 
+  geom_vline(xintercept = 188, linetype = 2, col = "red") + 
+  geom_vline(xintercept = 142, linetype = 2, col = "red")
 
 #Guardamos las iteraciones para el primer modelo de la validación cruzada
-saveRDS(xgb_train_rmse, file = "ingreso/output/xgb_train_rmse_all.rds")
+
+# saveRDS(xgb_train_rmse, file = "ingreso/output/xgb_train_rmse_all.rds")
 
 
 grid[which.min(xgb_train_rmse$.), ] 
@@ -118,30 +125,30 @@ grid[which.min(xgb_train_rmse$.), ]
 
 vamos a ajustar el modelo con los siguientes hiperparámetros:
 
-- max_depth = 6 
-- eta = 0.30
+- max_depth = 11
+- eta = 0.33
 
 ```{r, eval=FALSE}
 modelo <- xgboost(params = list(
   objective = "reg:squarederror",
-  eta = 0.30,
-  max_depth = 6),
+  eta = 0.33,
+  max_depth = 11),
   nrounds = 1000,
-  # early_stopping_rounds = 3,
+  early_stopping_rounds = 3,
   data = encuesta_mrp_m
 )
 
 ggplot(modelo$evaluation_log, aes(
   x = iter,
   y = train_rmse
-)) + geom_line() + geom_vline(xintercept = 71, col = "red")
+)) + geom_line() + geom_vline(xintercept = 44, col = "red",linetype = 2)
 
 
 modelo$evaluation_log[which.min(modelo$evaluation_log$train_rmse), ]
 
-modelo$evaluation_log[71, ]
+modelo$evaluation_log[43, ]
 
-saveRDS(modelo, file = "ingreso/output/modelo.rds")
+# saveRDS(modelo, file = "ingreso/output/modelo.rds")
 ```
 
 -   Podemos observar que en la creación de los árboles, luego de 71 iteraciones el Error Cuadrático Medio se estabiliza y tiene un cambio mínimo con respecto a la última iteración.
@@ -432,19 +439,23 @@ grid.arrange(p1, p2, nrow = 2, left = "RMSE", bottom = "Iteración")
 ## Predicción con la encuesta
 
 ```{r, eval=FALSE}
+y = test[,2]
+encuesta_mrp_m <- xgb.DMatrix(data = as.matrix(sapply(test[,-2], as.numeric)), label = as.matrix(sapply(y, as.numeric)))
+
+
 pred <- predict(modelo, newdata = encuesta_mrp_m)
 
-saveRDS(pred, file = "ingreso/output/pred_encuesta.rds")
+# saveRDS(pred, file = "ingreso/output/pred_encuesta.rds")
 ```
 
 ```{r}
 pred <- readRDS("ingreso/output/pred_encuesta.rds")
 
-encuesta_mrp$pred <- pred
+test$pred <- pred
 ```
 
 ```{r}
-matrix(c(mean(encuesta_mrp$ingreso, mean(encuesta_mrp$pred))),
+matrix(c(mean(train$ingreso, mean(test$pred))),
        ncol = 2, dimnames = list(" " = "media", "Estimación" = c("Encuesta", "Predicción") ))
 ```
 
@@ -456,19 +467,19 @@ ggplot(encuesta_mrp) +
 ```
 
 ```{r}
-pred_encuesta <- ggplot(encuesta_mrp) + 
-  geom_histogram(aes(x = ingreso,fill = "Observados"), 
+pred_encuesta <- ggplot() + 
+  geom_histogram(data = train, aes(x = ingreso,fill = "Observados"), 
                  bins = 30,
                  color = "#C55A11",
                  alpha = 0.5,
-                 size = 0.2) +
-  geom_histogram(aes(x = pred, fill = "Predichos"), 
+                 linewidth = 0.2) +
+  geom_histogram(data = test, aes(x = pred, fill = "Predichos"), 
                  bins = 30,
                  color = "#008194",
                  alpha = 0.3,
-                 size = 0.2) +
+                 linewidth = 0.2) +
 scale_fill_manual(values = c("#C55A11", "#008194")) +  labs(x = "Ingreso", y = " ", fill = "Valores") +
-  xlim(0, 2500000) +
+  xlim(0, 1000000) +
   theme_classic()
 ```
 
@@ -502,7 +513,7 @@ censo_mrp1 <- xgb.DMatrix(data = as.matrix(sapply(censo_mrp, as.numeric)))
 ```{r, eval=FALSE}
 pred <- predict(modelo, newdata = censo_mrp1)
 
-saveRDS(pred, file = "ingreso/output/pred.rds")
+#saveRDS(pred, file = "ingreso/output/pred.rds")
 ```
 
 ```{r}

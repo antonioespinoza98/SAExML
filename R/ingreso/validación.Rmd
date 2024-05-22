@@ -54,6 +54,21 @@ media_est_srvyr <- svyby(
 ```
 
 ```{r}
+confint_int <- confint(svyby(formula = ~ingreso,
+                             by = ~region,
+                             design = diseno,
+                             svymean))
+
+confint_int <- data.table(confint_int, keep.rownames = TRUE)
+colnames(confint_int) <- c("region","min_inter", "max_inter")
+
+confint_int$ingreso <- media_est_srvyr$ingreso
+
+```
+
+
+
+```{r}
 censo_mrp <- censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") %>%  
       mutate(
   region = recode(dam,
@@ -64,8 +79,10 @@ censo_mrp <- censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") %>%
                "05" = "Huetar Caribe",
                "06" = "Huetar Norte")) %>%
   mutate(region = as.factor(region))
+```
 
 
+```{r}
 pred <- readRDS("ingreso/output/pred.rds")
 
 censo_mrp$pred_ingreso <- pred
@@ -89,62 +106,18 @@ mapping <- cbind(mapping, estim)
 ```
 
 ```{r}
-plot_validacion <- mapping %>% 
+mapping %>% 
   ggplot(
     aes(x = region,
-        y = ingreso,
-        col = estim)
-  ) + geom_point(size = 2) + theme_minimal() +
+        y = ingreso)
+  ) + geom_point(aes(color = estim),size = 2, position = "jitter") + theme_minimal() +
     scale_color_manual(values = c("red","green")) +  
-  labs(x = "Región de planificación", y = "Ingreso medio", fill = "Modelo") + ylim(0, 400000)
+  labs(x = "Región de planificación", y = "Ingreso medio", col = "Modelo") + 
+  geom_errorbar(data = confint_int,aes(x= region, ymin = min_inter,
+                                       ymax = max_inter))
 ```
 
 ```{r}
 ggsave(plot_validacion, filename = "ingreso/output/validacion.png")
 ```
-
-```{r}
-censo_mrp %>%
-  group_by(region) %>% 
-  summarise(
-  media_ingreso = mean(pred_ingreso)
-)
-```
-
-```{r}
-encuesta_mrp %>% 
-  group_by(region) %>% 
-  summarise(
-    media_ingreso = mean(ingreso)
-  )
-```
-
-
-```{r}
-encuesta_mrp %>% 
-  group_by(edad) %>% 
-  filter(edad == 1) %>% 
-  select(edad, region, ingreso) %>% 
-  summarise(n = n())
-```
-
-
-```{r}
-prueba = subset(encuesta_mrp, edad == 1)
-
-table(prueba$ingreso)
-```
-
-
-```{r}
-encuesta_mrp %>% 
-  filter(ingreso == 0) %>% 
-  group_by(region) %>% 
-  summarise(n = n())
-
-```
-
-
-
-
 

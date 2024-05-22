@@ -91,11 +91,10 @@ for(i in 1:nrow(grid)){
     booster = "gblinear",
     lambda = grid$lambda[i],
     alpha = grid$alpha[i],
+    lambda_bias = grid$lambda_bias[i],
     max_depth = grid$max_depth[i],
-    params = list(
-      objective = "reg:squarederror",
-      eval_metric = "rmse"
-      ),
+    objective = "reg:squarederror",
+    eval_metric = "rmse",
     nrounds = 1000,
     early_stopping_rounds = 3, # training with a validation set will stop if the performance does not improve for k rounds (3)
     nfold = 5
@@ -126,9 +125,8 @@ xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) +
 ```{r}
 #Guardamos las iteraciones para el primer modelo de la validación cruzada
 
-saveRDS(xgb_train_rmse, file = "ingreso/output/xgb_train_rmse_all.rds")
-saveRDS(xgb_test_rmse, file = "ingreso/output/xgb_test_rmse_all.rds")
- 
+# saveRDS(xgb_train_rmse, file = "ingreso/output/xgb_train_rmse_all.rds")
+# saveRDS(xgb_test_rmse, file = "ingreso/output/xgb_test_rmse_all.rds")
 ```
 
 ```{r}
@@ -179,8 +177,10 @@ ggplot(modelo$evaluation_log, aes(
   y = train_rmse
 )) + geom_line() +
   geom_vline(xintercept = 202, col = "red", linetype = 2) + theme_minimal()
+```
 
-saveRDS(modelo, file = "ingreso/output/modelo.rds")
+```{r}
+# saveRDS(modelo, file = "ingreso/output/modelo.rds")
 ```
 
 -   Podemos observar que en la creación de los árboles, luego de 71 iteraciones el Error Cuadrático Medio se estabiliza y tiene un cambio mínimo con respecto a la última iteración.
@@ -255,6 +255,7 @@ for(i in 1:nrow(grid)){
     lambda = grid$lambda[i],
     alpha = grid$alpha[i],
     max_depth = grid$max_depth[i],
+    lambda_bias = grid$lambda_bias[i],
     objective = "reg:squarederror",
     eval_metric = "rmse",
     nrounds = 1000,
@@ -282,18 +283,21 @@ xgb_test_rmse <- xgb_test_rmse %>%
 
 xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) + 
   geom_line()
+```
 
+```{r}
 #Guardamos las iteraciones para el primer modelo de la validación cruzada
 
-saveRDS(xgb_train_rmse, file = "ingreso/output/xgb_train_rmse_geo.rds")
-saveRDS(xgb_test_rmse, file = "ingreso/output/xgb_test_rmse_geo.rds")
+# saveRDS(xgb_train_rmse, file = "ingreso/output/xgb_train_rmse_geo.rds")
+# saveRDS(xgb_test_rmse, file = "ingreso/output/xgb_test_rmse_geo.rds")
+```
 
 
-# xgb_train_rmse <- readRDS("ingreso/output/xgb_train_rmse_geo.rds")
+```{r}
+xgb_train_rmse <- readRDS("ingreso/output/xgb_train_rmse_geo.rds")
 
 grid[which.min(xgb_train_rmse$.), ] 
 
-# 102
 xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) + 
   geom_line() + 
   geom_vline(xintercept = 270, linetype = 2, col = "red") + theme_minimal()
@@ -303,7 +307,6 @@ max depth: 7
 lambda: 1
 lambda bias: 2
 alpha: 5
-
 
 ```{r}
 modelo1 <- xgboost(
@@ -333,9 +336,10 @@ ggplot(modelo1$evaluation_log, aes(
   y = train_rmse
 )) + geom_line() +
   geom_vline(xintercept = 374, col = "red", linetype = 2) + theme_minimal()
+```
 
+```{r}
 saveRDS(modelo1, file = "ingreso/output/modelo1.rds")
-
 ```
 
 
@@ -413,6 +417,7 @@ for(i in 1:nrow(grid)){
     lambda = grid$lambda[i],
     alpha = grid$alpha[i],
     max_depth = grid$max_depth[i],
+    lambda_bias = grid$lambda_bias[i],
     objective = "reg:squarederror",
     eval_metric = "rmse",
     nrounds = 1000,
@@ -440,14 +445,19 @@ xgb_test_rmse <- xgb_test_rmse %>%
 
 xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) + 
   geom_line()
+```
 
+```{r}
 #Guardamos las iteraciones para el primer modelo de la validación cruzada
 
 saveRDS(xgb_train_rmse, file = "ingreso/output/xgb_train_rmse_census.rds")
 saveRDS(xgb_test_rmse, file = "ingreso/output/xgb_test_rmse_census.rds")
+```
 
 
-# xgb_train_rmse <- readRDS("ingreso/output/xgb_train_rmse_geo.rds")
+
+```{r}
+xgb_train_rmse <- readRDS("ingreso/output/xgb_train_rmse_geo.rds")
 
 grid[which.min(xgb_train_rmse$.), ] 
 
@@ -476,9 +486,13 @@ modelo2 <- xgboost(
   early_stopping_rounds = 3,
   data = encuesta_mrp_m
 )
+```
 
+```{r}
 saveRDS(modelo2, file = "ingreso/output/modelo2.rds")
+```
 
+```{r}
 ggplot(modelo2$evaluation_log, aes(
   x = iter,
   y = train_rmse
@@ -548,12 +562,17 @@ grid.arrange(p1, p2, nrow = 2, left = "RMSE", bottom = "Iteración")
 ## Predicción con la encuesta
 
 ```{r, eval=FALSE}
-y = test[,2]
-encuesta_mrp_m <- xgb.DMatrix(data = as.matrix(sapply(test[,-2], as.numeric)), label = as.matrix(sapply(y, as.numeric)))
+sparse_matrix <- sparse.model.matrix(ingreso ~ ., data = encuesta_mrp)[, -1]
 
+y = encuesta_mrp[,2]
+
+encuesta_mrp_m <- xgb.DMatrix(data = sparse_matrix,
+                              label = as.matrix(sapply(y, as.numeric)))
 
 pred <- predict(modelo, newdata = encuesta_mrp_m)
+```
 
+```{r}
 # saveRDS(pred, file = "ingreso/output/pred_encuesta.rds")
 ```
 
@@ -566,13 +585,6 @@ encuesta_mrp$pred <- pred
 ```{r}
 matrix(c(mean(encuesta_mrp$ingreso, mean(encuesta_mrp$pred))),
        ncol = 2, dimnames = list(" " = "media", "Estimación" = c("Encuesta", "Predicción") ))
-```
-
-```{r, eval=FALSE}
-ggplot(encuesta_mrp) + 
-  geom_histogram(aes(x = ingreso),stat = "density", adjust = 80, fill = "#C55A11",col = "#C55A11") +
-  geom_histogram(aes(x = pred), stat = "density", adjust = 80, fill = "#008194",col = "#008194", alpha = 0.3) +
-  theme_classic() 
 ```
 
 ```{r}

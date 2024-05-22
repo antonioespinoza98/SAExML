@@ -42,11 +42,7 @@ options(scipen=999)
 ```{r}
 # Encuesta quitamos ingreso, lp, li y fep
 encuesta_mrp <- data.table(readRDS("ingreso/datos/encuesta_mrp1.rds")) %>% 
-  select(
-    # -X2016_crops.coverfraction, -X2016_urban.coverfraction,
-    #      -X2016_gHM, -accessibility, -accessibility_walking_only,
-         -dam,-area1, -sexo2,-edad2,-edad3, -edad4,-edad5,-anoest2,
-         -anoest3, -anoest4, -discapacidad1,-etnia1,-lp,-li,-fep,-pobreza) %>% 
+  select(-dam,-lp,-li,-fep) %>% 
   mutate_if(is.character, as.factor)
 
 summary(encuesta_mrp)
@@ -125,8 +121,9 @@ xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) +
 ```{r}
 #Guardamos las iteraciones para el primer modelo de la validación cruzada
 
-# saveRDS(xgb_train_rmse, file = "ingreso/output/xgb_train_rmse_all.rds")
-# saveRDS(xgb_test_rmse, file = "ingreso/output/xgb_test_rmse_all.rds")
+saveRDS(xgb_train_rmse, file = "ingreso/output/xgb_train_rmse_all.rds")
+saveRDS(xgb_test_rmse, file = "ingreso/output/xgb_test_rmse_all.rds")
+
 ```
 
 ```{r}
@@ -138,17 +135,15 @@ grid[which.min(xgb_train_rmse[0:40, ]$.), ]
 
 xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) + 
   geom_line() +
-  geom_vline(xintercept = 26, linetype = 2, col = "red") 
+  geom_vline(xintercept = 7, linetype = 2, col = "red") + theme_minimal() 
 ```
-
-- El RMSE es menor en la iteración 879. Sin embargo, como se puede observar en el gráfico. El RMSE tiene un comportamiento igual a lo largo de las iteraciones. Por la diferencia entre la iteración 879 y la 26 es mínima. Por lo que siempre buscamos tener un modelo parsimonioso y con una cantidad reducida en la complejidad del modelo. Para este caso, es mejor tener un modelo con una cantidad de nodos reducidos en comparación con uno más complejo y amplio.
 
 vamos a ajustar el modelo con los siguientes hiperparámetros:
 
 - max_depth = 6
 - lambda = 0
-- lambda_bias = 4
-- alpha = 1
+- lambda_bias = 1
+- alpha = 0
 
 ```{r, eval=FALSE}
 modelo <- xgboost(
@@ -156,8 +151,8 @@ modelo <- xgboost(
   objective = "reg:squarederror",
   max_depth = 6,
   lambda = 0,
-  lambda_bias = 4,
-  alpha = 1,
+  lambda_bias = 1,
+  alpha = 0,
   nrounds = 1000,
   early_stopping_rounds = 3,
   data = encuesta_mrp_m
@@ -176,11 +171,12 @@ ggplot(modelo$evaluation_log, aes(
   x = iter,
   y = train_rmse
 )) + geom_line() +
-  geom_vline(xintercept = 202, col = "red", linetype = 2) + theme_minimal()
+  geom_vline(xintercept = 260, col = "red", linetype = 2) + theme_minimal()
 ```
 
 ```{r}
-# saveRDS(modelo, file = "ingreso/output/modelo.rds")
+saveRDS(modelo, file = "ingreso/output/modelo.rds")
+
 ```
 
 -   Podemos observar que en la creación de los árboles, luego de 71 iteraciones el Error Cuadrático Medio se estabiliza y tiene un cambio mínimo con respecto a la última iteración.
@@ -189,10 +185,11 @@ ggplot(modelo$evaluation_log, aes(
 
 ```{r, eval=FALSE}
 importancia <- xgb.importance(
+  feature_names = colnames(sparse_matrix),
   model = modelo
 )
 
-importancia
+
 p1 <- xgb.ggplot.importance(importancia)
 ```
 
@@ -613,17 +610,20 @@ ggsave(pred_encuesta, filename = "ingreso/output/encuesta.png")
 
 ## Predicción con el censo
 ```{r}
-censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") %>% ungroup() %>% 
-  select( area, sexo, anoest, edad, discapacidad,
+censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") %>% ungroup() %>%
+  select( area, sexo, anoest, discapacidad, edad, 
          F182013_stable_lights, X2016_crops.coverfraction,
-         X2016_urban.coverfraction, X2016_gHM, 
+         X2016_urban.coverfraction, X2016_gHM,
          accessibility, accessibility_walking_only,
+         area1, sexo2, edad2, edad3, edad4, edad5, anoest2, anoest3,
+         anoest4, discapacidad1, etnia1, 
          tiene_alcantarillado, tiene_electricidad,
          tiene_acueducto, tiene_gas, eliminar_basura,
          tiene_internet, piso_tierra,material_paredes,
          material_techo, rezago_escolar, alfabeta,
          hacinamiento,tasa_desocupacion
          )
+
 ```
 
 ```{r}

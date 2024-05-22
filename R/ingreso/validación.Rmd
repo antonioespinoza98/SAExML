@@ -21,11 +21,11 @@ lapply(x, require, character.only = TRUE)
 
 ```{r}
 encuesta_mrp <- readRDS("ingreso/datos/encuesta_mrp1.rds") %>% 
-  select(
-    # -X2016_crops.coverfraction, -X2016_urban.coverfraction,
-    #      -X2016_gHM, -accessibility, -accessibility_walking_only,
-         -area1, -sexo2,-edad2,-edad3, -edad4,-edad5,-anoest2,
-         -anoest3, -anoest4, -discapacidad1,-etnia1,-lp,-li,-pobreza) %>% 
+  # select(
+  #   # -X2016_crops.coverfraction, -X2016_urban.coverfraction,
+  #   #      -X2016_gHM, -accessibility, -accessibility_walking_only,
+  #        -area1, -sexo2,-edad2,-edad3, -edad4,-edad5,-anoest2,
+  #        -anoest3, -anoest4, -discapacidad1,-etnia1,-lp,-li,-pobreza) %>% 
         mutate(
   region = recode(dam,
                "01" = "Central",

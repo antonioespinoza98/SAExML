@@ -11,11 +11,12 @@ fecha: mayo - 2024
 
 
 ```{r}
+options(scipen = 999)
 rm(list = ls())
 ```
 
 ```{r}
-x <- c('tidyverse','survey','srvyr')
+x <- c('tidyverse','survey','srvyr','data.table')
 lapply(x, require, character.only = TRUE)
 ```
 
@@ -114,7 +115,7 @@ mapping %>%
     scale_color_manual(values = c("red","green")) +  
   labs(x = "Región de planificación", y = "Ingreso medio", col = "Modelo") + 
   geom_errorbar(data = confint_int,aes(x= region, ymin = min_inter,
-                                       ymax = max_inter))
+                                       ymax = max_inter)) + ylim(0, 400000)
 ```
 
 ```{r}

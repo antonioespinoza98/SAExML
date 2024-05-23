@@ -67,9 +67,153 @@ encuesta_mrp_m <- xgb.DMatrix(data = sparse_matrix,
 ```
 
 
+```{r}
+y %>% ggplot(aes(x = ingreso)) + geom_density(stat = "density", fill = "red", alpha = 0.5) + theme_minimal() + xlim(0, 1000000)
+```
+
+```{r}
+library(MASS)
+
+encuesta <- subset(encuesta_mrp, ingreso > 0)
+ingreso <- encuesta$ingreso/10000
+
+fitdistr(ingreso, "gamma")
+
+ks.test(ingreso, "pgamma", shape = 1.2719982344,
+        rate = 0.0459924364)
+```
+
+
+```{r}
+ks.test(y$ingreso, "pnorm", mean(y$ingreso), sd(y$ingreso))
+```
+
+
 # Modelo con todas las covariables
 
-## Validación cruzada
+## Modelo GBlinear
+
+### Validación cruzada
+
+```{r, eval=FALSE}
+grid <- expand_grid(
+  lambda = seq(0, 10, 1),
+  lambda_bias = seq(0, 10, 1),
+  alpha = seq(0, 10, 1)
+)
+```
+
+```{r}
+xgb_train_rmse <- numeric(nrow(grid))
+xgb_test_rmse <- numeric(nrow(grid))
+
+
+for(i in 1:nrow(grid)){
+  xgb_untuned = xgb.cv(
+    data = encuesta_mrp_m,
+    booster = "gblinear",
+    lambda = grid$lambda[i],
+    alpha = grid$alpha[i],
+    lambda_bias = grid$lambda_bias[i],
+    objective = "reg:squarederror",
+    eval_metric = "rmse",
+    nrounds = 1000,
+    early_stopping_rounds = 3, # training with a validation set will stop if the performance does not improve for k rounds (3)
+    nfold = 5
+  )
+  
+  xgb_train_rmse[i] <-
+    xgb_untuned$evaluation_log$train_rmse_mean[xgb_untuned$best_iteration]
+  xgb_test_rmse[i] <-
+    xgb_untuned$evaluation_log$test_rmse_mean[xgb_untuned$best_iteration]
+  
+  cat(i, "\n")
+}
+```
+
+```{r, eval=FALSE}
+xgb_train_rmse <- xgb_train_rmse %>% 
+  tibble() %>% 
+  mutate(simulacion = seq(1:1080))
+
+xgb_test_rmse <- xgb_test_rmse %>% 
+  tibble() %>% 
+  mutate(simulacion = seq(1:1080))
+````
+
+```{r}
+#Guardamos las iteraciones para el primer modelo de la validación cruzada
+
+# saveRDS(xgb_train_rmse, file = "ingreso/output/xgb_train_rmse_all.rds")
+# saveRDS(xgb_test_rmse, file = "ingreso/output/xgb_test_rmse_all.rds")
+
+```
+
+
+```{r}
+xgb_train_rmse <- readRDS("ingreso/output/xgb_train_rmse_all.rds")
+```
+
+```{r}
+xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) + 
+  geom_line()
+```
+
+```{r}
+grid[which.min(xgb_train_rmse$.), ] 
+
+xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) + 
+  geom_line() +
+  geom_vline(xintercept = 7, linetype = 2, col = "red") +
+  # xlim(215, 300) +
+  theme_minimal() 
+```
+
+vamos a ajustar el modelo con los siguientes hiperparámetros:
+
+- max_depth = 6
+- lambda = 0
+- lambda_bias = 1
+- alpha = 0
+
+```{r, eval=FALSE}
+modelo <- xgboost(
+  booster = "gblinear",
+  objective = "reg:squarederror",
+  max_depth = 6,
+  eta = 0.30,
+  lambda = 0,
+  # lambda_bias = 1,
+  alpha = 0,
+  nrounds = 1000,
+  early_stopping_rounds = 3,
+  data = encuesta_mrp_m
+)
+
+ggplot(modelo$evaluation_log, aes(
+  x = iter,
+  y = train_rmse
+)) + geom_line() 
+
+# Valor minimo
+modelo$evaluation_log[which.min(modelo$evaluation_log$train_rmse), ]
+eval <- modelo$evaluation_log
+
+ggplot(modelo$evaluation_log, aes(
+  x = iter,
+  y = train_rmse
+)) + geom_line() +
+  geom_vline(xintercept = 260, col = "red", linetype = 2) + theme_minimal()
+```
+
+```{r}
+saveRDS(modelo, file = "ingreso/output/modelo.rds")
+
+```
+
+## Modelo GBtree
+
+### Validación cruzada
 
 ```{r, eval=FALSE}
 grid <- expand_grid(
@@ -190,19 +334,6 @@ saveRDS(modelo, file = "ingreso/output/modelo.rds")
 
 ```
 
--   Podemos observar que en la creación de los árboles, luego de 71 iteraciones el Error Cuadrático Medio se estabiliza y tiene un cambio mínimo con respecto a la última iteración.
-
-## importancia de variables
-
-```{r, eval=FALSE}
-importancia <- xgb.importance(
-  feature_names = colnames(sparse_matrix),
-  model = modelo
-)
-
-
-p1 <- xgb.ggplot.importance(importancia)
-```
 
 # Modelo ajustado con parámetros de regularización mas pequeños
 

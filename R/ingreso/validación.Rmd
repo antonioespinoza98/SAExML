@@ -15,7 +15,7 @@ rm(list = ls())
 ```
 
 ```{r}
-x <- c('tidyverse','survey','srvyr')
+x <- c('tidyverse','survey','srvyr', 'data.table')
 lapply(x, require, character.only = TRUE)
 ```
 

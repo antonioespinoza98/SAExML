@@ -84,7 +84,9 @@ censo_mrp <- censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") %>%
 
 ```{r}
 pred <- readRDS("ingreso/output/pred.rds")
+```
 
+```{r}
 censo_mrp$pred_ingreso <- pred
 ```
 

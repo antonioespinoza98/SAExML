@@ -43,7 +43,13 @@ options(scipen=999)
 # Encuesta quitamos ingreso, lp, li y fep
 encuesta_mrp <- data.table(readRDS("ingreso/datos/encuesta_mrp1.rds")) %>% 
   select(-dam,-lp,-li,-fep) %>% 
-  mutate_if(is.character, as.factor)
+  mutate_if(is.character, as.factor) %>% 
+  dplyr::rename(
+    area_cat = area,
+    sexo_cat = sexo,
+    anoest_cat = anoest,
+    discapacidad_cat = discapacidad
+  )
 
 summary(encuesta_mrp)
 head(encuesta_mrp)
@@ -154,8 +160,9 @@ modelo <- xgboost(
   booster = "gblinear",
   objective = "reg:squarederror",
   max_depth = 6,
+  eta = 0.30,
   lambda = 0,
-  lambda_bias = 1,
+  # lambda_bias = 1,
   alpha = 0,
   nrounds = 1000,
   early_stopping_rounds = 3,
@@ -197,7 +204,7 @@ importancia <- xgb.importance(
 p1 <- xgb.ggplot.importance(importancia)
 ```
 
-# Modelo ajustado con parametros de regularizacion mas pequenos
+# Modelo ajustado con parámetros de regularización mas pequeños
 
 
 ```{r}
@@ -813,11 +820,11 @@ ggplot() +
 
 ```{r}
 importancia <- xgb.importance(
-  feature_names = names(encuesta_mrp[,-c(3,27)]),
   model = modelo
 )
 
 xgb.ggplot.importance(importancia)
+                              
 ```
 
 # Predicción censo con modelo reducido (parámetros)
@@ -844,6 +851,12 @@ censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") %>% ungroup() %>%
          material_techo, rezago_escolar, alfabeta,
          hacinamiento,tasa_desocupacion
          )
+  dplyr::rename(
+    area_cat = area,
+    sexo_cat = sexo,
+    anoest_cat = anoest,
+    discapacidad_cat = discapacidad
+  )
 
 ```
 

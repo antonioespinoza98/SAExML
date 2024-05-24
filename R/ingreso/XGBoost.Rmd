@@ -56,13 +56,31 @@ head(encuesta_mrp)
 str(encuesta_mrp)
 ```
 
+```{r}
+encuesta_mrp <- readRDS("ingreso/datos/encuesta_df_agg.rds") %>% 
+  data.table() |>
+  select(-dam, -n) |>
+  mutate_if(is.character, as.factor) %>% 
+  dplyr::rename(
+    area_cat = area,
+    sexo_cat = sexo,
+    anoest_cat = anoest,
+    edad_cat = edad,
+    discapacidad_cat = discapacidad
+  )
+
+
+str(encuesta_mrp)
+```
+
+
 ## Matriz
 
 ```{r}
 # Debido a que el XGBoosting solo toma valores numericos, se debe hacer una pequeña transformación para hacerlo funcionar.
 
 sparse_matrix <- sparse.model.matrix(ingreso ~ ., data = encuesta_mrp)[, -1]
-y = encuesta_mrp[,2]
+y = encuesta_mrp[,6]
 
 encuesta_mrp_m <- xgb.DMatrix(data = sparse_matrix,
                               label = as.matrix(sapply(y, as.numeric)))
@@ -72,7 +90,7 @@ encuesta_mrp_m <- xgb.DMatrix(data = sparse_matrix,
 ## Prueba distribución
 
 ```{r}
-y %>% ggplot(aes(x = ingreso)) + geom_density(stat = "density", fill = "red", alpha = 0.5) + theme_minimal() + xlim(0, 1000000)
+encuesta_mrp %>% ggplot(aes(x = ingreso)) + geom_density(stat = "density", fill = "red", alpha = 0.5) + theme_minimal() 
 ```
 
 ```{r}
@@ -148,8 +166,8 @@ xgb_test_rmse <- xgb_test_rmse %>%
 ```{r}
 #Guardamos las iteraciones para el primer modelo de la validación cruzada
 
-saveRDS(xgb_train_rmse, file = "ingreso/output/xgb_train_rmse_all_linear.rds")
-saveRDS(xgb_test_rmse, file = "ingreso/output/xgb_test_rmse_all_linear.rds")
+saveRDS(xgb_train_rmse, file = "ingreso/output/xgb_train_rmse_all_linear_agg.rds")
+saveRDS(xgb_test_rmse, file = "ingreso/output/xgb_test_rmse_all_linear_agg.rds")
 
 ```
 
@@ -168,14 +186,19 @@ grid[which.min(xgb_train_rmse$.), ]
 
 xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) + 
   geom_line() +
-  geom_vline(xintercept = 100, linetype = 2, col = "red") +
-  xlim(0, 150) +
+  geom_vline(xintercept = 114, linetype = 2, col = "red") +
+  xlim(0, 200) +
   theme_minimal() 
 ```
 
 ### Modelo
 
 vamos a ajustar el modelo con los siguientes hiperparámetros:
+
+* Modelo agregado
+- lambda = 0
+- lambda_bias = 10
+- alpha = 3
 
 - lambda = 0
 - lambda_bias = 9
@@ -186,8 +209,8 @@ modelo <- xgboost(
   booster = "gblinear",
   objective = "reg:squarederror",
   lambda = 0,
-  lambda_bias = 9,
-  alpha = 0,
+  lambda_bias = 10,
+  alpha = 3,
   nrounds = 1000,
   early_stopping_rounds = 3,
   data = encuesta_mrp_m
@@ -206,11 +229,11 @@ ggplot(modelo$evaluation_log, aes(
   x = iter,
   y = train_rmse
 )) + geom_line() +
-  geom_vline(xintercept = 29, col = "red", linetype = 2) + theme_minimal()
+  geom_vline(xintercept = 213, col = "red", linetype = 2) + theme_minimal()
 ```
 
 ```{r}
-saveRDS(modelo, file = "ingreso/output/modelo.rds")
+saveRDS(modelo, file = "ingreso/output/modelo_agg.rds")
 
 ```
 
@@ -241,10 +264,28 @@ str(encuesta_mrp)
 ```
 
 ```{r}
+encuesta_mrp <- readRDS("ingreso/datos/encuesta_df_agg.rds") %>% 
+  data.table() |>
+  select(-dam, -n) |>
+  mutate_if(is.character, as.factor) %>% 
+  dplyr::rename(
+    area_cat = area,
+    sexo_cat = sexo,
+    anoest_cat = anoest,
+    edad_cat = edad,
+    discapacidad_cat = discapacidad
+  )
+
+
+str(encuesta_mrp)
+```
+
+
+```{r}
 # Debido a que el XGBoosting solo toma valores numericos, se debe hacer una pequeña transformación para hacerlo funcionar.
 
 sparse_matrix <- sparse.model.matrix(ingreso ~ ., data = encuesta_mrp)[, -1]
-y = encuesta_mrp[,2]
+y = encuesta_mrp[,6]
 
 encuesta_mrp_m <- xgb.DMatrix(data = sparse_matrix,
                               label = as.matrix(sapply(y, as.numeric)))
@@ -303,8 +344,8 @@ xgb_test_rmse <- xgb_test_rmse %>%
 ```{r}
 #Guardamos las iteraciones para el primer modelo de la validación cruzada
 
-saveRDS(xgb_train_rmse, file = "ingreso/output/xgb_train_rmse_all_tree.rds")
-saveRDS(xgb_test_rmse, file = "ingreso/output/xgb_test_rmse_all_tree.rds")
+saveRDS(xgb_train_rmse, file = "ingreso/output/xgb_train_rmse_all_tree_agg.rds")
+saveRDS(xgb_test_rmse, file = "ingreso/output/xgb_test_rmse_all_tree_agg.rds")
 
 ```
 
@@ -320,19 +361,27 @@ xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) +
 
 ```{r}
 grid[which.min(xgb_train_rmse$.), ] 
-grid[1585, ] 
+grid[3207, ] 
 
 
 xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) + 
   geom_line() +
-  geom_vline(xintercept = 1585, linetype = 2, col = "red") +
-  # xlim(215, 300) +
+  geom_vline(xintercept = 3207, linetype = 2, col = "red") +
+  xlim(2500, 3420) +
   theme_minimal() 
 ```
 
 ### Modelo
 
 vamos a ajustar el modelo con los siguientes hiperparámetros:
+
+* modelo agregado
+
+- eta = 0.95
+- depth = 10
+- lambda = 0
+- alpha = 2
+
 
 - eta = 0.5
 - depth = 10
@@ -343,10 +392,10 @@ vamos a ajustar el modelo con los siguientes hiperparámetros:
 modelo <- xgboost(
   booster = "gbtree",
   objective = "reg:squarederror",
-  eta = 0.5,
+  eta = 0.95,
   max_depth = 10,
   lambda = 0,
-  alpha = 0,
+  alpha = 2,
   nrounds = 1000,
   early_stopping_rounds = 3,
   data = encuesta_mrp_m
@@ -365,11 +414,11 @@ ggplot(modelo$evaluation_log, aes(
   x = iter,
   y = train_rmse
 )) + geom_line() +
-  geom_vline(xintercept = 163, col = "red", linetype = 2) + theme_minimal()
+  geom_vline(xintercept = 59, col = "red", linetype = 2) + theme_minimal()
 ```
 
 ```{r}
-saveRDS(modelo, file = "ingreso/output/modelo_tree.rds")
+saveRDS(modelo, file = "ingreso/output/modelo_tree_agg.rds")
 ```
 
 # Evaluación
@@ -379,8 +428,8 @@ rm(list = ls())
 ```
 
 ```{r}
-modelo <- readRDS("ingreso/output/modelo.rds")
-modelo2 <- readRDS("ingreso/output/modelo_tree.rds")
+modelo <- readRDS("ingreso/output/modelo_agg.rds")
+modelo2 <- readRDS("ingreso/output/modelo_tree_agg.rds")
 ```
 
 ## Importancia de variables

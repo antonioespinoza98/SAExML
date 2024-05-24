@@ -9,23 +9,23 @@ CEPAL - División de Estadística
 fecha: mayo - 2024
 
 
+# Librerías
+
+```{r}
+x <- c('tidyverse','survey','srvyr', 'data.table','gridExtra')
+lapply(x, require, character.only = TRUE)
+```
 
 ```{r}
 rm(list = ls())
 ```
 
-```{r}
-x <- c('tidyverse','survey','srvyr', 'data.table')
-lapply(x, require, character.only = TRUE)
-```
+# Datos
+
+## Encuesta
 
 ```{r}
 encuesta_mrp <- readRDS("ingreso/datos/encuesta_mrp1.rds") %>% 
-  # select(
-  #   # -X2016_crops.coverfraction, -X2016_urban.coverfraction,
-  #   #      -X2016_gHM, -accessibility, -accessibility_walking_only,
-  #        -area1, -sexo2,-edad2,-edad3, -edad4,-edad5,-anoest2,
-  #        -anoest3, -anoest4, -discapacidad1,-etnia1,-lp,-li,-pobreza) %>% 
         mutate(
   region = recode(dam,
                "01" = "Central",
@@ -39,10 +39,14 @@ encuesta_mrp <- readRDS("ingreso/datos/encuesta_mrp1.rds") %>%
   mutate(dam = as.factor(dam))
 ```
 
+## Diseño
+
 ```{r}
 diseno <- encuesta_mrp  %>% 
   as_survey_design(weights = fep)
 ```
+
+## Cálculo estimador directo
 
 ```{r}
 media_est_srvyr <- svyby(
@@ -52,6 +56,8 @@ media_est_srvyr <- svyby(
   svymean
 )
 ```
+
+## Intervalos de confianza
 
 ```{r}
 confint_int <- confint(svyby(formula = ~ingreso,
@@ -66,7 +72,9 @@ confint_int$ingreso <- media_est_srvyr$ingreso
 
 ```
 
+# Primera predicción (GBlinear)
 
+## Censo
 
 ```{r}
 censo_mrp <- censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") %>%  
@@ -81,15 +89,15 @@ censo_mrp <- censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") %>%
   mutate(region = as.factor(region))
 ```
 
-
 ```{r}
 pred <- readRDS("ingreso/output/pred.rds")
-pred2 <- readRDS("ingreso/output/pred2.rds")
 ```
 
 ```{r}
-censo_mrp$pred_ingreso <- pred2
+censo_mrp$pred_ingreso <- pred
 ```
+
+## Calculo ingreso
 
 ```{r}
 ingreso_dam <- censo_mrp %>% 
@@ -108,19 +116,101 @@ estim <- c(rep("Directo", 6), rep("XGBoost", 6))
 mapping <- cbind(mapping, estim)
 ```
 
+
+## Gráfico
+
 ```{r}
-mapping %>% 
-  ggplot(
-    aes(x = region,
-        y = ingreso)
-  ) + geom_point(aes(color = estim),size = 2, position = "jitter") + theme_minimal() +
-    scale_color_manual(values = c("red","green")) +  
-  labs(x = "Región de planificación", y = "Ingreso medio", col = "Modelo") + 
-  geom_errorbar(data = confint_int,aes(x= region, ymin = min_inter,
-                                       ymax = max_inter))
+
+p1 <- mapping %>%
+  ggplot(aes(x = region, y = ingreso)) + geom_point(aes(color = estim), size = 2, position = "jitter") +
+  scale_color_manual(values = c("red", "green")) +
+  labs(title = "Validación para modelo de regresión", x = "Región de planificación", y = "Ingreso", col = "Modelo") +
+  geom_errorbar(data = confint_int, aes(x = region, ymin = min_inter, ymax = max_inter)) +
+  theme_minimal()
+
 ```
 
 ```{r}
-ggsave(plot_validacion, filename = "ingreso/output/validacion.png")
+saveRDS(p1, "ingreso/output/validacion_regre.rds")
 ```
+
+
+# Segunda predicción (GBtree)
+
+## Censo
+
+
+```{r}
+censo_mrp <- censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") %>%  
+      mutate(
+  region = recode(dam,
+               "01" = "Central",
+               "02" = "Chorotega",
+               "03" = "Pacífico Central",
+               "04" = "Brunca",
+               "05" = "Huetar Caribe",
+               "06" = "Huetar Norte")) %>%
+  mutate(region = as.factor(region))
+```
+
+
+```{r}
+pred2 <- readRDS("ingreso/output/pred2.rds")
+```
+
+```{r}
+censo_mrp$pred_ingreso <- pred2
+```
+
+## Calculo ingreso
+
+```{r}
+ingreso_dam <- censo_mrp %>% 
+  group_by(region) %>% 
+  summarise(
+    ingreso = mean(pred_ingreso)
+  ) 
+```
+
+
+```{r}
+mapping <- rbind(media_est_srvyr[,-3], ingreso_dam)
+
+estim <- c(rep("Directo", 6), rep("XGBoost", 6))
+
+mapping <- cbind(mapping, estim)
+```
+
+
+## Gráfico
+
+```{r}
+p2 <- mapping %>%
+  ggplot(aes(x = region, y = ingreso)) + geom_point(aes(color = estim), size = 2, position = "jitter") +
+  scale_color_manual(values = c("red", "green")) +
+  labs(title = "Validación para modelo de árbol", x = "Región de planificación", y = "Ingreso", col = "Modelo") +
+  geom_errorbar(data = confint_int, aes(x = region, ymin = min_inter, ymax = max_inter)) +
+  theme_minimal()
+```
+
+
+```{r}
+saveRDS(p2, "ingreso/output/validacion_arbol.rds")
+```
+
+# Comparación
+
+```{r}
+p1 <- readRDS("ingreso/output/validacion_regre.rds")
+p2 <- readRDS("ingreso/output/validacion_arbol.rds")
+```
+
+
+```{r}
+grid.arrange(p1, p2)
+```
+
+# Benchmark
+
+
 

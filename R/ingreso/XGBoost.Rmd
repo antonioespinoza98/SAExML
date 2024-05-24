@@ -56,6 +56,8 @@ head(encuesta_mrp)
 str(encuesta_mrp)
 ```
 
+## Matriz
+
 ```{r}
 # Debido a que el XGBoosting solo toma valores numericos, se debe hacer una pequeña transformación para hacerlo funcionar.
 
@@ -66,6 +68,8 @@ encuesta_mrp_m <- xgb.DMatrix(data = sparse_matrix,
                               label = as.matrix(sapply(y, as.numeric)))
 ```
 
+
+## Prueba distribución
 
 ```{r}
 y %>% ggplot(aes(x = ingreso)) + geom_density(stat = "density", fill = "red", alpha = 0.5) + theme_minimal() + xlim(0, 1000000)
@@ -168,6 +172,8 @@ xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) +
   xlim(0, 150) +
   theme_minimal() 
 ```
+
+### Modelo
 
 vamos a ajustar el modelo con los siguientes hiperparámetros:
 
@@ -324,6 +330,8 @@ xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) +
   theme_minimal() 
 ```
 
+### Modelo
+
 vamos a ajustar el modelo con los siguientes hiperparámetros:
 
 - eta = 0.5
@@ -364,477 +372,7 @@ ggplot(modelo$evaluation_log, aes(
 saveRDS(modelo, file = "ingreso/output/modelo_tree.rds")
 ```
 
-
-# Modelo ajustado con parámetros de regularización mas pequeños
-
-
-```{r}
-# Encuesta quitamos ingreso, lp, li y fep
-encuesta_mrp <- data.table(readRDS("ingreso/datos/encuesta_mrp1.rds")) %>% 
-  select(-dam,-lp,-li,-fep) %>% 
-  mutate_if(is.character, as.factor)
-
-summary(encuesta_mrp)
-head(encuesta_mrp)
-str(encuesta_mrp)
-```
-
-```{r, eval=FALSE}
-grid <- expand_grid(
-  max_depth = seq(6, 10, 1),
-  lambda = seq(0, 1, 0.15),
-  lambda_bias = seq(0, 1, 0.15),
-  alpha = seq(0, 1, 0.15)
-)
-```
-
-```{r}
-# Debido a que el XGBoosting solo toma valores numericos, se debe hacer una pequeña transformación para hacerlo funcionar.
-
-sparse_matrix <- sparse.model.matrix(ingreso ~ ., data = encuesta_mrp)[, -1]
-y = encuesta_mrp[,2]
-
-encuesta_mrp_m <- xgb.DMatrix(data = sparse_matrix,
-                              label = as.matrix(sapply(y, as.numeric)))
-```
-
-```{r}
-
-xgb_train_rmse <- numeric(nrow(grid))
-xgb_test_rmse <- numeric(nrow(grid))
-
-
-for(i in 1:nrow(grid)){
-  xgb_untuned = xgb.cv(
-    data = encuesta_mrp_m,
-    booster = "gblinear",
-    lambda = grid$lambda[i],
-    alpha = grid$alpha[i],
-    lambda_bias = grid$lambda_bias[i],
-    max_depth = grid$max_depth[i],
-    objective = "reg:squarederror",
-    eval_metric = "rmse",
-    nrounds = 1000,
-    early_stopping_rounds = 3, # training with a validation set will stop if the performance does not improve for k rounds (3)
-    nfold = 5
-  )
-  
-  xgb_train_rmse[i] <-
-    xgb_untuned$evaluation_log$train_rmse_mean[xgb_untuned$best_iteration]
-  xgb_test_rmse[i] <-
-    xgb_untuned$evaluation_log$test_rmse_mean[xgb_untuned$best_iteration]
-  
-  cat(i, "\n")
-}
-```
-
-```{r, eval=FALSE}
-xgb_train_rmse <- xgb_train_rmse %>% 
-  tibble() %>% 
-  mutate(simulacion = seq(1:1715))
-
-xgb_test_rmse <- xgb_test_rmse %>% 
-  tibble() %>% 
-  mutate(simulacion = seq(1:1715))
-````
-
-```{r}
-#Guardamos las iteraciones para el primer modelo de la validación cruzada
-
-saveRDS(xgb_train_rmse, file = "ingreso/output/xgb_train_rmse_all_redu.rds")
-# saveRDS(xgb_test_rmse, file = "ingreso/output/xgb_test_rmse_all_redu.rds")
-
-```
-
-
-```{r}
-xgb_train_rmse <- readRDS("ingreso/output/xgb_train_rmse_all_redu.rds")
-```
-
-```{r}
-xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) + 
-  geom_line()
-```
-
-```{r}
-grid[which.min(xgb_train_rmse$.), ]
-
-xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) + 
-  geom_line() +
-  geom_vline(xintercept = 34, linetype = 2, col = "red") +
-  xlim(0, 100) +
-  theme_minimal() 
-```
-
-vamos a ajustar el modelo con los siguientes hiperparámetros:
-
-- max_depth = 6
-- lambda = 0
-- lambda_bias = 0.6
-- alpha = 0.75
-
-```{r, eval=FALSE}
-modelo <- xgboost(
-  booster = "gblinear",
-  objective = "reg:squarederror",
-  max_depth = 6,
-  lambda = 0,
-  lambda_bias = 0.6,
-  alpha = 0.75,
-  nrounds = 1000,
-  early_stopping_rounds = 3,
-  data = encuesta_mrp_m
-)
-
-ggplot(modelo$evaluation_log, aes(
-  x = iter,
-  y = train_rmse
-)) + geom_line() 
-
-# Valor minimo
-modelo$evaluation_log[which.min(modelo$evaluation_log$train_rmse), ]
-eval <- modelo$evaluation_log
-
-ggplot(modelo$evaluation_log, aes(
-  x = iter,
-  y = train_rmse
-)) + geom_line() +
-  geom_vline(xintercept = 261, col = "red", linetype = 2) + theme_minimal()
-```
-
-```{r}
-saveRDS(modelo, file = "ingreso/output/modelo_redu.rds")
-```
-
-
-
-# Modelo con solo covariables geo espaciales
-
-```{r}
-rm(list = ls()) 
-```
-
-## Datos
-
-```{r}
-encuesta_mrp <- readRDS("ingreso/datos/encuesta_mrp1.rds")
-```
-
-```{r}
-# Encuesta quitamos ingreso, lp, li y fep
-encuesta_mrp <- encuesta_mrp %>% 
-  select(
-    F182013_stable_lights, X2016_crops.coverfraction, X2016_urban.coverfraction, X2016_gHM, accessibility, 
-    accessibility_walking_only, ingreso
-  )
-
-summary(encuesta_mrp)
-```
-
-```{r}
-# Debido a que el XGBoosting solo toma valores numericos, se debe hacer una pequeña transformación para hacerlo funcionar.
-
-sparse_matrix <- sparse.model.matrix(ingreso ~ ., data = encuesta_mrp)[, -1]
-
-y = encuesta_mrp[,7]
-
-encuesta_mrp_m <- xgb.DMatrix(data = sparse_matrix,
-                              label = as.matrix(sapply(y, as.numeric)))
-```
-
-```{r, eval=FALSE}
-grid <- expand_grid(
-  max_depth = seq(6, 10, 1),
-  lambda = seq(0, 5, 1),
-  lambda_bias = seq(0, 5, 1),
-  alpha = seq(0, 5, 1)
-)
-```
-
-
-## Validación cruzada
-
-```{r, eval=FALSE}
-
-xgb_train_rmse <- numeric(nrow(grid))
-xgb_test_rmse <- numeric(nrow(grid))
-
-
-for(i in 1:nrow(grid)){
-  xgb_untuned = xgb.cv(
-    data = encuesta_mrp_m,
-    booster = "gblinear",
-    lambda = grid$lambda[i],
-    alpha = grid$alpha[i],
-    max_depth = grid$max_depth[i],
-    lambda_bias = grid$lambda_bias[i],
-    objective = "reg:squarederror",
-    eval_metric = "rmse",
-    nrounds = 1000,
-    early_stopping_rounds = 3, # training with a validation set will stop if the performance does not improve for k rounds (3)
-    nfold = 5
-  )
-  
-  xgb_train_rmse[i] <-
-    xgb_untuned$evaluation_log$train_rmse_mean[xgb_untuned$best_iteration]
-  xgb_test_rmse[i] <-
-    xgb_untuned$evaluation_log$test_rmse_mean[xgb_untuned$best_iteration]
-  
-  cat(i, "\n")
-}
-```
-
-```{r}
-xgb_train_rmse <- xgb_train_rmse %>% 
-  tibble() %>% 
-  mutate(simulacion = seq(1:1080))
-
-xgb_test_rmse <- xgb_test_rmse %>% 
-  tibble() %>% 
-  mutate(simulacion = seq(1:1080))
-
-xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) + 
-  geom_line()
-```
-
-```{r}
-#Guardamos las iteraciones para el primer modelo de la validación cruzada
-
-# saveRDS(xgb_train_rmse, file = "ingreso/output/xgb_train_rmse_geo.rds")
-# saveRDS(xgb_test_rmse, file = "ingreso/output/xgb_test_rmse_geo.rds")
-```
-
-
-```{r}
-xgb_train_rmse <- readRDS("ingreso/output/xgb_train_rmse_geo.rds")
-
-grid[which.min(xgb_train_rmse$.), ] 
-
-xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) + 
-  geom_line() + 
-  geom_vline(xintercept = 270, linetype = 2, col = "red") + theme_minimal()
-```
-
-max depth: 7
-lambda: 1
-lambda bias: 2
-alpha: 5
-
-```{r}
-modelo1 <- xgboost(
-  booster = "gblinear",
-  objective = "reg:squarederror",
-  max_depth = 7,
-  lambda = 1,
-  lambda_bias = 2,
-  alpha = 5,
-  nrounds = 1000,
-  early_stopping_rounds = 3,
-  data = encuesta_mrp_m
-)
-
-ggplot(modelo1$evaluation_log, aes(
-  x = iter,
-  y = train_rmse
-)) + geom_line() 
-
-# Valor minimo
-modelo1$evaluation_log[which.min(modelo1$evaluation_log$train_rmse), ]
-
-eval <- modelo1$evaluation_log
-
-ggplot(modelo1$evaluation_log, aes(
-  x = iter,
-  y = train_rmse
-)) + geom_line() +
-  geom_vline(xintercept = 374, col = "red", linetype = 2) + theme_minimal()
-```
-
-```{r}
-saveRDS(modelo1, file = "ingreso/output/modelo1.rds")
-```
-
-
-## importancia de variables
-
-```{r}
-importancia <- xgb.importance(
-  model = modelo1
-)
-
-p2 <- xgb.ggplot.importance(importancia)
-```
-
-# Modelo con solo las variables censales
-
-## Datos
-
-```{r}
-rm(list = ls())
-```
-
-```{r, eval=FALSE}
-encuesta_mrp <- data.table(readRDS("ingreso/datos/encuesta_mrp1.rds"))
-```
-
-
-```{r, eval=FALSE}
-# Encuesta quitamos ingreso, lp, li y fep
-encuesta_mrp <- encuesta_mrp %>% 
-  select(
-    area, ingreso,sexo, anoest, edad, discapacidad, 
-    tiene_alcantarillado, tiene_electricidad, tiene_acueducto,
-    tiene_gas, eliminar_basura, tiene_internet, piso_tierra,
-    material_paredes, material_techo, rezago_escolar, alfabeta,
-    hacinamiento, tasa_desocupacion
-  ) %>% 
-  mutate_if(is.character, as.factor) 
-
-summary(encuesta_mrp)
-```
-
-```{r}
-# Debido a que el XGBoosting solo toma valores numericos, se debe hacer una pequeña transformación para hacerlo funcionar.
-
-sparse_matrix <- sparse.model.matrix(ingreso ~ ., data = encuesta_mrp)[, -1]
-y = encuesta_mrp[,2]
-
-encuesta_mrp_m <- xgb.DMatrix(data = sparse_matrix,
-                              label = as.matrix(sapply(y, as.numeric)))
-```
-
-
-## Validación cruzada
-
-```{r, eval=FALSE}
-grid <- expand_grid(
-  max_depth = seq(6, 10, 1),
-  lambda = seq(0, 5, 1),
-  lambda_bias = seq(0, 5, 1),
-  alpha = seq(0, 5, 1)
-)
-```
-
-
-
-```{r, eval=FALSE}
-xgb_train_rmse <- numeric(nrow(grid))
-xgb_test_rmse <- numeric(nrow(grid))
-
-
-for(i in 1:nrow(grid)){
-  xgb_untuned = xgb.cv(
-    data = encuesta_mrp_m,
-    booster = "gblinear",
-    lambda = grid$lambda[i],
-    alpha = grid$alpha[i],
-    max_depth = grid$max_depth[i],
-    lambda_bias = grid$lambda_bias[i],
-    objective = "reg:squarederror",
-    eval_metric = "rmse",
-    nrounds = 1000,
-    early_stopping_rounds = 3, # training with a validation set will stop if the performance does not improve for k rounds (3)
-    nfold = 5
-  )
-  
-  xgb_train_rmse[i] <-
-    xgb_untuned$evaluation_log$train_rmse_mean[xgb_untuned$best_iteration]
-  xgb_test_rmse[i] <-
-    xgb_untuned$evaluation_log$test_rmse_mean[xgb_untuned$best_iteration]
-  
-  cat(i, "\n")
-}
-```
-
-```{r, eval=FALSE}
-xgb_train_rmse <- xgb_train_rmse %>% 
-  tibble() %>% 
-  mutate(simulacion = seq(1:1080))
-
-xgb_test_rmse <- xgb_test_rmse %>% 
-  tibble() %>% 
-  mutate(simulacion = seq(1:1080))
-
-xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) + 
-  geom_line()
-```
-
-```{r}
-#Guardamos las iteraciones para el primer modelo de la validación cruzada
-
-saveRDS(xgb_train_rmse, file = "ingreso/output/xgb_train_rmse_census.rds")
-saveRDS(xgb_test_rmse, file = "ingreso/output/xgb_test_rmse_census.rds")
-```
-
-```{r}
-xgb_train_rmse <- readRDS("ingreso/output/xgb_train_rmse_geo.rds")
-
-grid[which.min(xgb_train_rmse$.), ] 
-
-
-xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) + 
-  geom_line() + 
-  geom_vline(xintercept = 1, linetype = 2, col = "red") +
-  xlim(1,100) +
- theme_minimal()
-```
-
- - max depth = 6
- - lambda = 0
- - lambda_bias = 0
- - alpha = 0
-
-```{r, eval=FALSE}
-modelo2 <- xgboost(
-  booster = "gblinear",
-  objective = "reg:squarederror",
-  max_depth = 6,
-  lambda = 0,
-  lambda_bias = 0,
-  alpha = 0,
-  nrounds = 1000,
-  early_stopping_rounds = 3,
-  data = encuesta_mrp_m
-)
-```
-
-```{r}
-saveRDS(modelo2, file = "ingreso/output/modelo2.rds")
-```
-
-```{r}
-ggplot(modelo2$evaluation_log, aes(
-  x = iter,
-  y = train_rmse
-)) + geom_line() 
-
-# Valor minimo
-modelo2$evaluation_log[which.min(modelo2$evaluation_log$train_rmse), ]
-
-eval <- modelo2$evaluation_log
-
-ggplot(modelo2$evaluation_log, aes(
-  x = iter,
-  y = train_rmse
-)) + geom_line() +
-  geom_vline(xintercept = 121, col = "red", linetype = 2) + theme_minimal()
-
-```
-
--   Para este caso podemos observar que luego de 927 iteraciones el modelo se detuvo debido a que el modelo no mejoró luego de 927 por lo que ahí se detuvo.
--   Por otro lado, se puede observar que luego de 104 iteraciones el modelo estabiliza el Error Cuadrático Medio.
-
-## importancia de variables
-
-```{r, eval=FALSE}
-importancia <- xgb.importance(
-  model = modelo2
-)
-
-p3 <- xgb.ggplot.importance(importancia)
-```
-
-# Evaluación del RMSE para los tres modelos
+# Evaluación
 
 ```{r}
 rm(list = ls())
@@ -848,52 +386,24 @@ modelo2 <- readRDS("ingreso/output/modelo_tree.rds")
 ## Importancia de variables
 
 ```{r}
-importancia <- xgb.importance(
-  model = modelo
-)
+importancia <- xgb.importance(model = modelo) |>
+  data.table() |>
+  arrange(desc(Weight))
+
 
 importancia2 <- xgb.importance(
   model = modelo2
-)
+) |>
+  data.table() |>
+  arrange(desc(Gain))
 
+setdiff(importancia$Feature, importancia2$Feature)
 
-pi1 <- xgb.ggplot.importance(importancia)
-pi2 <- xgb.ggplot.importance(importancia2)
-
-library(gridExtra)
+pi1 <- xgb.ggplot.importance(importancia, rel_to_first = FALSE) 
+pi2 <- xgb.ggplot.importance(importancia2, rel_to_first = FALSE)
+  
 
 grid.arrange(pi1, pi2)
-```
-
-
-
-```{r}
-modelo <- readRDS("ingreso/output/modelo.rds")
-modelo1 <- readRDS("ingreso/output/modelo1.rds") 
-modelo2 <- readRDS("ingreso/output/modelo2.rds")
-```
-
-```{r}
-modelo$evaluation_log
-modelos <- rbind(modelo$evaluation_log, modelo1$evaluation_log,
-                 modelo2$evaluation_log)
-
-tot <- rep("todas cov", each = 286)
-geo <- rep("geo cov", each = 642)
-censo <- rep("censo cov", each = 124)
-
-modelos$mods <-  c(tot, geo, censo)
-```
-
-```{r}
-p1 <- ggplot(modelos, aes(x = iter, y = train_rmse, col = mods)) + geom_line(linewidth = 1) + labs(color = "Modelo") + xlab(" ") + ylab(" ") + theme_classic() + scale_color_manual(values=c("#008194", "#C55A11","#FFC000")) + xlim(0, 200)
-
-p2 <- ggplot(modelos, aes(x = iter, y = train_rmse, col = mods)) + geom_boxplot() + labs(color = " ") + xlab(" ") + ylab(" ") + theme_classic() + scale_color_manual(values=c("#008194", "#C55A11","#FFC000")) + xlim(0, 200)
-```
-
-
-```{r}
-grid.arrange(p1, p2, nrow = 2, left = "RMSE", bottom = "Iteración")
 ```
 
 ## Predicción con la encuesta
@@ -940,11 +450,6 @@ scale_fill_manual(values = c("#C55A11", "#008194")) +  labs(x = "Ingreso", y = "
   theme_classic()
 ```
 
-```{r, eval=FALSE}
-ggsave(pred_encuesta, filename = "ingreso/output/encuesta.png")
-```
-
-
 -   De acá se puede observar que el modelo con solo las covariables geoespaciales no están brindando suficiente información al modelo, generando así un Error Cuadrático Medio mucho más alto que sus otros competidores.
 -   Por otro lado, la ganancia que hay con el modelo con todas las covariables es muy poca con respecto al modelo con solo las covariables del censo.
 
@@ -988,98 +493,4 @@ pred2 <- predict(modelo2, newdata = censo_mrp1)
 saveRDS(pred, file = "ingreso/output/pred.rds")
 saveRDS(pred2, file = "ingreso/output/pred2.rds")
 ```
-
-```{r}
-pred <- readRDS("ingreso/output/pred.rds")
-pred2 <- readRDS("ingreso/output/pred2.rds")
-```
-
-```{r}
-censo_mrp$pred <- pred
-```
-
-```{r}
-matrix(c(mean(encuesta_mrp$ingreso), mean(censo_mrp$pred)),
-       ncol = 2, dimnames = list(" " = "media", "Estimación" = c("Encuesta", "Censo") ))
-```
-
-```{r}
-ggplot() +
-    geom_histogram(data = censo_mrp, aes(x = pred, fill = "Censo - predichos"),
-                 bins = 30,
-                 color = "#008194",
-                 alpha = 0.3,
-                 size = 0.2) +
-  geom_histogram(data = encuesta_mrp, aes(x = ingreso, fill = "Encuesta - observados"),
-                 bins = 30,
-                 color = "#C55A11",
-                 alpha = 0.5,
-                 size = 0.2) +
-  scale_fill_manual(values = c("#008194","#C55A11")) +  
-  labs(x = "Ingreso", y = " ", fill = "Valores") +
-  theme_classic()
-```
-
-
-```{r}
-importancia <- xgb.importance(
-  model = modelo
-)
-
-xgb.ggplot.importance(importancia)
-                              
-```
-
-# Predicción censo con modelo reducido (parámetros)
-
-```{r}
-rm(list = ls())
-```
-
-```{r}
-modelo <- readRDS("ingreso/output/modelo_redu.rds")
-```
-
-```{r}
-censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") %>% ungroup() %>%
-  select( area, sexo, anoest, discapacidad, edad, 
-         F182013_stable_lights, X2016_crops.coverfraction,
-         X2016_urban.coverfraction, X2016_gHM,
-         accessibility, accessibility_walking_only,
-         area1, sexo2, edad2, edad3, edad4, edad5, anoest2, anoest3,
-         anoest4, discapacidad1, etnia1, 
-         tiene_alcantarillado, tiene_electricidad,
-         tiene_acueducto, tiene_gas, eliminar_basura,
-         tiene_internet, piso_tierra,material_paredes,
-         material_techo, rezago_escolar, alfabeta,
-         hacinamiento,tasa_desocupacion
-         )
-  dplyr::rename(
-    area_cat = area,
-    sexo_cat = sexo,
-    anoest_cat = anoest,
-    discapacidad_cat = discapacidad
-  )
-
-```
-
-```{r}
-sparse_matrix <- sparse.model.matrix( ~ ., data = censo_mrp)[, -1]
-
-censo_mrp1 <- xgb.DMatrix(data = sparse_matrix)
-```
-
-```{r, eval=FALSE}
-pred <- predict(modelo, newdata = censo_mrp1)
-```
-
-```{r}
-saveRDS(pred, file = "ingreso/output/pred_redu.rds")
-```
-
-```{r}
-pred <- readRDS("ingreso/output/pred_redu.rds")
-censo_mrp$pred <- pred
-```
-
 

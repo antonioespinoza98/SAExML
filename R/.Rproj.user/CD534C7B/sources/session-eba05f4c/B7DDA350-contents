@@ -1,0 +1,561 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+Autor: Marco Espinoza
+CEPAL - División de Estadística
+fecha: mayo - 2024
+
+
+# Librerías
+
+```{r}
+x <- c('tidyverse','survey','srvyr', 'data.table','gridExtra','scales','patchwork','haven','sampling','xgboost')
+lapply(x, require, character.only = TRUE)
+```
+
+```{r}
+rm(list = ls())
+```
+
+# Datos
+
+## Encuesta lineal
+
+```{r}
+encuesta_mrp <- readRDS("ingreso/datos/encuesta_mrp1.rds") %>%
+  dplyr::filter(anoest != "98") |>
+        mutate(
+  region = recode(dam,
+               "01" = "Central",
+               "02" = "Chorotega",
+               "03" = "Pacífico Central",
+               "04" = "Brunca",
+               "05" = "Huetar Caribe",
+               "06" = "Huetar Norte")) %>%
+  mutate(region = as.factor(region)) %>% 
+  mutate_if(is.character, as.factor) %>% 
+  mutate(dam = as.factor(dam))
+```
+
+## Encuesta edad Categórica
+
+```{r}
+encuesta_mrp <- readRDS("ingreso/datos/encuesta_mrp.rds") %>%
+  dplyr::filter(anoest != "98") |>
+        mutate(
+  region = recode(dam,
+               "01" = "Central",
+               "02" = "Chorotega",
+               "03" = "Pacífico Central",
+               "04" = "Brunca",
+               "05" = "Huetar Caribe",
+               "06" = "Huetar Norte")) %>%
+  mutate(region = as.factor(region)) %>% 
+  mutate_if(is.character, as.factor) %>% 
+  mutate(dam = as.factor(dam))
+```
+
+
+## Diseño
+
+```{r}
+diseno <- encuesta_mrp  %>% 
+  as_survey_design(weights = fep)
+```
+
+## Cálculo estimador directo
+
+```{r}
+media_est_srvyr <- svyby(
+  ~ingreso,
+  by = ~region,
+  design = diseno,
+  svymean
+)
+```
+
+## Intervalos de confianza
+
+```{r}
+confint_int <- confint(svyby(formula = ~ingreso,
+                             by = ~region,
+                             design = diseno,
+                             svymean))
+
+confint_int <- data.table(confint_int, keep.rownames = TRUE)
+colnames(confint_int) <- c("region","min_inter", "max_inter")
+
+confint_int$ingreso <- media_est_srvyr$ingreso
+
+```
+
+# Primera predicción (GBlinear)
+
+## Censo lineal
+
+```{r}
+censo_mrp <- censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") %>%
+  dplyr::filter(anoest != "98") |>
+      mutate(
+  region = recode(dam,
+               "01" = "Central",
+               "02" = "Chorotega",
+               "03" = "Pacífico Central",
+               "04" = "Brunca",
+               "05" = "Huetar Caribe",
+               "06" = "Huetar Norte")) %>%
+  mutate(region = as.factor(region)) 
+```
+
+## Censo cat
+```{r}
+censo_mrp <- censo_mrp <- readRDS("ingreso/datos/cens0.rds") %>%
+  dplyr::filter(anoest != "98") |>
+      mutate(
+  region = recode(dam,
+               "01" = "Central",
+               "02" = "Chorotega",
+               "03" = "Pacífico Central",
+               "04" = "Brunca",
+               "05" = "Huetar Caribe",
+               "06" = "Huetar Norte")) %>%
+  mutate(region = as.factor(region)) 
+```
+
+
+```{r}
+pred <- readRDS("ingreso/output/pred.rds")
+pred_cat <- readRDS("ingreso/output/pred_cat.rds")
+```
+
+```{r}
+censo_mrp$pred_ingreso <- pred
+censo_mrp$pred_ingreso <- pred_cat
+```
+
+## Calculo ingreso
+
+```{r}
+ingreso_dam <- censo_mrp %>% 
+  group_by(region) %>% 
+  summarise(
+    ingreso = mean(pred_ingreso)
+  ) 
+```
+
+
+```{r}
+mapping <- rbind(media_est_srvyr[,-3], ingreso_dam)
+
+estim <- c(rep("Directo", 6), rep("XGBoost", 6))
+
+mapping <- cbind(mapping, estim)
+```
+
+
+## Gráfico
+
+```{r}
+
+p1 <- mapping %>%
+  ggplot(aes(x = region, y = ingreso)) + geom_point(aes(color = estim), size = 2, position = "jitter") +
+  scale_color_manual(values = c("red", "green")) +
+  labs(title = "Validación para modelo de regresión", x = "Región de planificación", y = "Ingreso", col = "Modelo") +
+  geom_errorbar(data = confint_int, aes(x = region, ymin = min_inter, ymax = max_inter)) +
+  theme_minimal()
+
+```
+
+```{r}
+saveRDS(p1, "ingreso/output/validacion_regre.rds")
+```
+
+
+# Segunda predicción (GBtree)
+
+## Censo
+
+```{r}
+censo_mrp <- censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") %>%
+  dplyr::filter(anoest != "98") |>
+      mutate(
+  region = recode(dam,
+               "01" = "Central",
+               "02" = "Chorotega",
+               "03" = "Pacífico Central",
+               "04" = "Brunca",
+               "05" = "Huetar Caribe",
+               "06" = "Huetar Norte")) %>%
+  mutate(region = as.factor(region)) 
+```
+
+
+```{r}
+pred2 <- readRDS("ingreso/output/pred2.rds")
+```
+
+```{r}
+censo_mrp$pred_ingreso <- pred2
+```
+
+## Calculo ingreso
+
+```{r}
+ingreso_dam <- censo_mrp %>% 
+  group_by(region) %>% 
+  summarise(
+    ingreso = mean(pred_ingreso)
+  ) 
+```
+
+
+```{r}
+mapping <- rbind(media_est_srvyr[,-3], ingreso_dam)
+
+estim <- c(rep("Directo", 6), rep("XGBoost", 6))
+
+mapping <- cbind(mapping, estim)
+```
+
+
+## Gráfico
+
+```{r}
+p2 <- mapping %>%
+  ggplot(aes(x = region, y = ingreso)) + geom_point(aes(color = estim), size = 2, position = "jitter") +
+  scale_color_manual(values = c("red", "green")) +
+  labs(title = "Validación para modelo de árbol", x = "Región de planificación", y = "Ingreso", col = "Modelo") +
+  geom_errorbar(data = confint_int, aes(x = region, ymin = min_inter, ymax = max_inter)) +
+  theme_minimal()
+```
+
+
+```{r}
+saveRDS(p2, "ingreso/output/validacion_arbol.rds")
+```
+
+# Tercera predicción (GBtree)
+
+## Encuesta
+
+```{r}
+encuesta_mrp <- readRDS("ingreso/datos/encuesta_mrp.rds") %>%
+  dplyr::filter(anoest != "98") |>
+        mutate(
+  region = recode(dam,
+               "01" = "Central",
+               "02" = "Chorotega",
+               "03" = "Pacífico Central",
+               "04" = "Brunca",
+               "05" = "Huetar Caribe",
+               "06" = "Huetar Norte")) %>%
+  mutate(region = as.factor(region)) %>% 
+  mutate_if(is.character, as.factor) %>% 
+  mutate(dam = as.factor(dam))
+```
+
+## Diseño
+
+```{r}
+diseno <- encuesta_mrp  %>% 
+  as_survey_design(weights = fep)
+```
+
+## Cálculo estimador directo
+
+```{r}
+media_est_srvyr <- svyby(
+  ~ingreso,
+  by = ~region,
+  design = diseno,
+  svymean
+)
+```
+
+## Intervalos de confianza
+
+```{r}
+confint_int <- confint(svyby(formula = ~ingreso,
+                             by = ~region,
+                             design = diseno,
+                             svymean))
+
+confint_int <- data.table(confint_int, keep.rownames = TRUE)
+colnames(confint_int) <- c("region","min_inter", "max_inter")
+
+confint_int$ingreso <- media_est_srvyr$ingreso
+
+```
+
+
+## Censo
+
+```{r}
+rm(list = ls())
+```
+
+
+```{r}
+censo_mrp <- censo_mrp <- readRDS("ingreso/datos/cens0.rds") %>%
+  dplyr::filter(anoest != "98") |>
+      mutate(
+  region = recode(dam,
+               "01" = "Central",
+               "02" = "Chorotega",
+               "03" = "Pacífico Central",
+               "04" = "Brunca",
+               "05" = "Huetar Caribe",
+               "06" = "Huetar Norte")) %>%
+  mutate(region = as.factor(region))
+```
+
+
+```{r}
+pred3 <- readRDS("ingreso/output/pred3.rds")
+```
+
+```{r}
+censo_mrp$pred_ingreso <- pred3
+```
+
+## Calculo ingreso
+
+```{r}
+ingreso_dam <- censo_mrp %>% 
+  group_by(region) %>% 
+  summarise(
+    ingreso = mean(pred_ingreso)
+  ) 
+```
+
+
+```{r}
+mapping <- rbind(media_est_srvyr[,-3], ingreso_dam)
+
+estim <- c(rep("Directo", 6), rep("XGBoost", 6))
+
+mapping <- cbind(mapping, estim)
+```
+
+
+## Gráfico
+
+```{r}
+p3 <- mapping %>%
+  ggplot(aes(x = region, y = ingreso)) + geom_point(aes(color = estim), size = 2, position = "jitter") +
+  scale_color_manual(values = c("red", "green")) +
+  labs(title = "Validación para modelo de árbol", x = "Región de planificación", y = "Ingreso", col = "Modelo") +
+  geom_errorbar(data = confint_int, aes(x = region, ymin = min_inter, ymax = max_inter)) +
+  theme_minimal()
+```
+
+
+```{r}
+saveRDS(p3, "ingreso/output/validacion_arbol_edadcat.rds")
+```
+
+
+# Comparación
+
+```{r}
+p1 <- readRDS("ingreso/output/validacion_regre.rds")
+p2 <- readRDS("ingreso/output/validacion_arbol.rds")
+```
+
+
+```{r}
+grid.arrange(p1, p2)
+```
+
+# Benchmark
+
+```{r}
+encuesta_mrp <- readRDS("ingreso/datos/encuesta_mrp1.rds")
+censo_mrp <- readRDS("ingreso/datos/censo_mrp.rds")
+
+statelevel_predictors_df <- readRDS("ingreso/datos/statelevel_predictors_df.rds")
+
+fit <- readRDS("ingreso/output/modelo_tree.rds")
+
+# Poststratification at the National Level --------------------------------
+
+byAgrega <-
+  grep(
+    pattern =  "^(n|pobreza|ingreso)",
+    x = names(censo_mrp),
+    invert = TRUE,
+    value = TRUE
+  )
+
+poststrat_df <- censo_mrp %>%  group_by_at(byAgrega) %>%
+  summarise(n = sum(n), .groups = "drop")
+names_sel <- names(poststrat_df)
+
+# Expand state level predictors to the individual level
+
+poststrat_df <- left_join(poststrat_df, statelevel_predictors_df,
+                          by = "dam")
+
+# Posterior_epred returns the posterior estimates for the different subgroups stored in the
+# poststrat_df dataframe.
+sparse_matrix <- sparse.model.matrix( ~ ., data = poststrat_df)[, -1]
+
+censo_mrp1 <- xgb.DMatrix(data = sparse_matrix)
+
+fit$feature_names
+
+epred_mat <- predict(fit, newdata = sparse_matrix, 
+                     allow.new.levels = TRUE)
+
+length(epred_mat[which(epred_mat < 0)])
+poststrat_df[which(epred_mat < 0),]
+epred_mat[which(epred_mat < 0)] = 1
+
+summary(epred_mat)
+hist(as.numeric(epred_mat))
+
+poststrat_df %<>% select(all_of(names_sel))
+poststrat_df$epred_mat <- epred_mat
+
+# Resultados nacionales ---------------------------------------------------
+## lineas de pobreza por área
+## "0" = "Rural", "1" = "Urbana"
+
+(lp <- encuesta_mrp %>% select(area,lp) %>% unique())
+poststrat_df %<>% inner_join(lp, by = "area")
+
+
+# Calculo de la pobreza Cepal.  -------------------------------------------
+encuesta_mrp %<>% mutate(pobreza = ingreso/lp)
+poststrat_df %<>% mutate(pobreza = epred_mat/lp)
+
+# definiendo diseno muestral
+
+diseno <- encuesta_mrp %>%
+  as_survey_design(weights = fep)
+
+###########################################
+###########################################
+###           Benchmarking              ###
+###     (Gutiérrez - Guerrero, 2022)    ###
+###########################################
+###########################################
+names_cov <-
+  grep(
+    pattern =  "^(n|pobreza|ingreso)",
+    x = names(censo_mrp),
+    invert = TRUE,
+    value = TRUE
+  )
+
+names_cov <- names_cov[names_cov %in% names(encuesta_mrp)]
+
+num_cat_censo <- apply(poststrat_df[names_cov], MARGIN = 2, function(x)
+  length(unique(x)))
+
+num_cat_sample <- apply(encuesta_mrp[names_cov], MARGIN = 2, function(x)
+  length(unique(x)))
+
+names_cov <- names_cov[num_cat_censo==num_cat_sample]
+#names_cov <- c("area",   "sexo",   "edad",   "anoest", "depto")
+
+poststrat_df %<>%
+  fastDummies::dummy_cols(select_columns = names_cov,
+                          remove_selected_columns = FALSE)
+
+
+estimaciones <-
+  map(names_cov ,~ poststrat_df %>% group_by_at(all_of(.x)) %>%
+        summarise(
+          medias = weighted.mean(pobreza, n),
+          Nhat = sum(n),
+          t_pobreza = sum(pobreza *n)
+        ))
+
+poststrat_df %<>% 
+  mutate_at(vars(matches("\\d$")) ,~.*poststrat_df$pobreza)
+
+
+### total
+totales <- map(names_cov, ~encuesta_mrp %>% group_by_at(all_of(.x)) %>% 
+                 summarise(
+                   medias = weighted.mean(pobreza,fep),
+                   Nhat = sum(fep),
+                   t_pobreza = sum(pobreza*fep)
+                 ))
+
+paso <- sapply(names_cov, function(byi){
+  encuesta_mrp %>% group_by_at(all_of(byi)) %>% 
+    summarise(t_pobreza = sum(pobreza*fep))
+})
+
+unlist(paso["t_pobreza",])
+sum(poststrat_df$n)
+
+poststrat_df$gk <- calib(Xs = poststrat_df %>% select(matches("\\d$")), 
+                         d = poststrat_df$n,
+                         total = unlist(paso["t_pobreza",]),
+                         method="logit") 
+
+checkcalibration(Xs = poststrat_df %>% select(matches("\\d$")), 
+                 d = poststrat_df$n,
+                 total = unlist(paso["t_pobreza",]),
+                 g = poststrat_df$gk)
+
+summary(poststrat_df$gk)
+
+map(names_cov ,~ poststrat_df %>% group_by_at(all_of(.x)) %>%
+      summarise(
+        Nhat = sum(n),
+        t_pobreza = sum(pobreza *n*gk)
+      ) %>% 
+      mutate(medias = t_pobreza/Nhat))
+
+poststrat_df %<>%
+  mutate(pobreza2 = pobreza *gk)  
+
+temp <- map(names_cov ,~ poststrat_df %>% group_by_at(all_of(.x)) %>%
+              summarise(
+                Nhat = sum(n),
+                t_pobreza = sum(n*pobreza2)
+              ) %>% 
+              mutate(medias = t_pobreza/Nhat)) 
+
+
+totales[[1]]$medias-temp[[1]]$medias
+totales[[2]]$medias-temp[[2]]$medias
+totales[[3]]$medias-temp[[3]]$medias
+totales[[4]]$medias-temp[[4]]$medias
+totales[[5]]$medias-temp[[5]]$medias
+
+jpeg(file = "CRI/2021/1.Ingreso/Output/Plot_Bench_Pobreza.jpeg")
+hist(poststrat_df$gk)
+dev.off()
+
+saveRDS(poststrat_df %>% select(!matches("_\\d{,2}$")), 
+        "CRI/2021/1.Ingreso/Data/poststrat_df.RDS")
+saveRDS(encuesta_mrp, "CRI/2021/1.Ingreso/Data/encuesta_mrp.RDS")
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

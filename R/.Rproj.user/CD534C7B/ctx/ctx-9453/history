@@ -1,0 +1,512 @@
+xgb_train_rmse <- xgb_train_rmse %>%
+tibble() %>%
+mutate(simulacion = seq(1:208))
+xgb_train_rmse <- xgb_train_rmse %>%
+tibble() %>%
+mutate(simulacion = seq(1:2808))
+xgb_test_rmse <- xgb_test_rmse %>%
+tibble() %>%
+mutate(simulacion = seq(1:2808))
+saveRDS(xgb_train_rmse, file = "ingreso/output/xgb_train_rmse_all.rds")
+saveRDS(xgb_test_rmse, file = "ingreso/output/xgb_train_rmse_all.rds")
+grid[which.min(xgb_train_rmse$.), ]
+rm(list = ls())
+x <- c('tidyverse','xgboost','gridExtra','caTools','haven','data.table',
+'Matrix')
+lapply(x, require, character.only = TRUE)
+rm(list = ls())
+set.seed(1998)
+options(scipen=999)
+# Encuesta quitamos ingreso, lp, li y fep
+encuesta_mrp <- data.table(readRDS("ingreso/datos/encuesta_mrp1.rds")) %>%
+select(
+# -X2016_crops.coverfraction, -X2016_urban.coverfraction,
+#      -X2016_gHM, -accessibility, -accessibility_walking_only,
+-dam,-area1, -sexo2,-edad2,-edad3, -edad4,-edad5,-anoest2,
+-anoest3, -anoest4, -discapacidad1,-etnia1,-lp,-li,-fep,-pobreza) %>%
+mutate_if(is.character, as.factor)
+summary(encuesta_mrp)
+head(encuesta_mrp)
+str(encuesta_mrp)
+# Debido a que el XGBoosting solo toma valores numericos, se debe hacer una pequeña transformación para hacerlo funcionar.
+sparse_matrix <- sparse.model.matrix(ingreso ~ ., data = encuesta_mrp)[, -1]
+y = encuesta_mrp[,2]
+encuesta_mrp_m <- xgb.DMatrix(data = sparse_matrix,
+label = as.matrix(sapply(y, as.numeric)))
+grid <- expand_grid(
+max_depth = seq(6, 10, 1),
+lambda = seq(0, 5, 1),
+lambda_bias = seq(0, 5, 1),
+alpha = seq(0, 5, 1)
+)
+xgb_train_rmse <- numeric(nrow(grid))
+xgb_test_rmse <- numeric(nrow(grid))
+for(i in 1:nrow(grid)){
+xgb_untuned = xgb.cv(
+data = encuesta_mrp_m,
+booster = "gblinear",
+lambda = grid$lambda[i],
+alpha = grid$alpha[i],
+lambda_bias = grid$lambda_bias[i],
+max_depth = grid$max_depth[i],
+objective = "reg:squarederror",
+eval_metric = "rmse",
+nrounds = 1000,
+early_stopping_rounds = 3, # training with a validation set will stop if the performance does not improve for k rounds (3)
+nfold = 5
+)
+xgb_train_rmse[i] <-
+xgb_untuned$evaluation_log$train_rmse_mean[xgb_untuned$best_iteration]
+xgb_test_rmse[i] <-
+xgb_untuned$evaluation_log$test_rmse_mean[xgb_untuned$best_iteration]
+cat(i, "\n")
+}
+rm(list = ls())
+x <- c('tidyverse','xgboost','gridExtra','caTools','haven','data.table',
+'Matrix')
+lapply(x, require, character.only = TRUE)
+set.seed(1998)
+options(scipen=999)
+# Encuesta quitamos ingreso, lp, li y fep
+encuesta_mrp <- data.table(readRDS("ingreso/datos/encuesta_mrp1.rds")) %>%
+# select(
+# -X2016_crops.coverfraction, -X2016_urban.coverfraction,
+#      -X2016_gHM, -accessibility, -accessibility_walking_only,
+# -dam,-area1, -sexo2,-edad2,-edad3, -edad4,-edad5,-anoest2,
+# -anoest3, -anoest4, -discapacidad1,-etnia1,-lp,-li,-fep,-pobreza)
+mutate_if(is.character, as.factor)
+View(encuesta_mrp)
+summary(encuesta_mrp)
+# Encuesta quitamos ingreso, lp, li y fep
+encuesta_mrp <- data.table(readRDS("ingreso/datos/encuesta_mrp1.rds")) %>%
+select(-lp,-li,-fep,-pobreza) %>%
+mutate_if(is.character, as.factor)
+# Encuesta quitamos ingreso, lp, li y fep
+encuesta_mrp <- data.table(readRDS("ingreso/datos/encuesta_mrp1.rds")) %>%
+select(-etnia, -lp,-li,-fep,-pobreza) %>%
+mutate_if(is.character, as.factor)
+# Encuesta quitamos ingreso, lp, li y fep
+encuesta_mrp <- data.table(readRDS("ingreso/datos/encuesta_mrp1.rds")) %>%
+select(-etnia, -lp,-li,-fep) %>%
+mutate_if(is.character, as.factor)
+summary(encuesta_mrp)
+rm(list = ls())
+# Encuesta quitamos ingreso, lp, li y fep
+encuesta_mrp <- data.table(readRDS("ingreso/datos/encuesta_mrp1.rds")) %>%
+select(-etnia, -lp,-li,-fep) %>%
+mutate_if(is.character, as.factor)
+# Encuesta quitamos ingreso, lp, li y fep
+encuesta_mrp <- data.table(readRDS("ingreso/datos/encuesta_mrp1.rds")) %>%
+select(-lp,-li,-fep) %>%
+mutate_if(is.character, as.factor)
+summary(encuesta_mrp)
+head(encuesta_mrp)
+str(encuesta_mrp)
+# Encuesta quitamos ingreso, lp, li y fep
+encuesta_mrp <- data.table(readRDS("ingreso/datos/encuesta_mrp1.rds")) %>%
+select(-dam,-lp,-li,-fep) %>%
+mutate_if(is.character, as.factor)
+str(encuesta_mrp)
+sparse_matrix <- sparse.model.matrix(ingreso ~ ., data = encuesta_mrp)[, -1]
+y = encuesta_mrp[,2]
+y
+sparse_matrix
+encuesta_mrp_m <- xgb.DMatrix(data = sparse_matrix,
+label = as.matrix(sapply(y, as.numeric)))
+grid <- expand_grid(
+max_depth = seq(6, 10, 1),
+lambda = seq(0, 5, 1),
+lambda_bias = seq(0, 5, 1),
+alpha = seq(0, 5, 1)
+)
+xgb_train_rmse <- numeric(nrow(grid))
+xgb_test_rmse <- numeric(nrow(grid))
+for(i in 1:nrow(grid)){
+xgb_untuned = xgb.cv(
+data = encuesta_mrp_m,
+booster = "gblinear",
+lambda = grid$lambda[i],
+alpha = grid$alpha[i],
+lambda_bias = grid$lambda_bias[i],
+max_depth = grid$max_depth[i],
+objective = "reg:squarederror",
+eval_metric = "rmse",
+nrounds = 1000,
+early_stopping_rounds = 3, # training with a validation set will stop if the performance does not improve for k rounds (3)
+nfold = 5
+)
+xgb_train_rmse[i] <-
+xgb_untuned$evaluation_log$train_rmse_mean[xgb_untuned$best_iteration]
+xgb_test_rmse[i] <-
+xgb_untuned$evaluation_log$test_rmse_mean[xgb_untuned$best_iteration]
+cat(i, "\n")
+}
+censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") %>% ungroup()
+View(censo_mrp)
+names(censo_mrp)
+names(encuesta_mrp)
+xgb_train_rmse <- xgb_train_rmse %>%
+tibble() %>%
+mutate(simulacion = seq(1:1080))
+xgb_test_rmse <- xgb_test_rmse %>%
+tibble() %>%
+mutate(simulacion = seq(1:1080))
+xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) +
+geom_line()
+grid[which.min(xgb_train_rmse$.), ]
+grid[which.min(xgb_train_rmse[0:40, ]$.), ]
+which.min(xgb_train_rmse$.)
+xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) +
+geom_line() +
+geom_vline(xintercept = 7, linetype = 2, col = "red")
+xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) +
+geom_line() +
+geom_vline(xintercept = 7, linetype = 2, col = "red") + theme_minimal()
+modelo <- xgboost(
+booster = "gblinear",
+objective = "reg:squarederror",
+max_depth = 6,
+lambda = 0,
+lambda_bias = 1,
+alpha = 0,
+nrounds = 1000,
+early_stopping_rounds = 3,
+data = encuesta_mrp_m
+)
+ggplot(modelo$evaluation_log, aes(
+x = iter,
+y = train_rmse
+)) + geom_line()
+# Valor minimo
+modelo$evaluation_log[which.min(modelo$evaluation_log$train_rmse), ]
+eval <- modelo$evaluation_log
+View(eval)
+saveRDS(xgb_train_rmse, file = "ingreso/output/xgb_train_rmse_all.rds")
+saveRDS(xgb_test_rmse, file = "ingreso/output/xgb_test_rmse_all.rds")
+grid[which.min(xgb_train_rmse$.), ]
+ggplot(modelo$evaluation_log, aes(
+x = iter,
+y = train_rmse
+)) + geom_line()
+# Valor minimo
+modelo$evaluation_log[which.min(modelo$evaluation_log$train_rmse), ]
+ggplot(modelo$evaluation_log, aes(
+x = iter,
+y = train_rmse
+)) + geom_line() +
+geom_vline(xintercept = 346, col = "red", linetype = 2) + theme_minimal()
+View(eval)
+ggplot(modelo$evaluation_log, aes(
+x = iter,
+y = train_rmse
+)) + geom_line() +
+geom_vline(xintercept = 260, col = "red", linetype = 2) + theme_minimal()
+saveRDS(modelo, file = "ingreso/output/modelo.rds")
+importancia <- xgb.importance(
+model = modelo
+)
+importancia
+p1 <- xgb.ggplot.importance(importancia)
+p1
+p1 <- xgb.ggplot.importance(importancia)
+p1
+sort(importancia)
+p1 <- xgb.ggplot.importance(importancia)
+p1
+rlang::last_trace()
+importancia <- xgb.importance(
+feature_names = colnames(sparse_matrix)
+model = modelo
+importancia <- xgb.importance(
+feature_names = colnames(sparse_matrix),
+model = modelo
+)
+p1 <- xgb.ggplot.importance(importancia)
+p1
+importancia <- xgb.importance(
+feature_names = colnames(sparse_matrix),
+model = modelo
+)
+importancia
+rm(list = ls())
+encuesta_mrp <- readRDS("ingreso/datos/encuesta_mrp1.rds") %>%
+# select(
+#   # -X2016_crops.coverfraction, -X2016_urban.coverfraction,
+#   #      -X2016_gHM, -accessibility, -accessibility_walking_only,
+#        -area1, -sexo2,-edad2,-edad3, -edad4,-edad5,-anoest2,
+#        -anoest3, -anoest4, -discapacidad1,-etnia1,-lp,-li,-pobreza) %>%
+mutate(
+region = recode(dam,
+"01" = "Central",
+"02" = "Chorotega",
+"03" = "Pacífico Central",
+"04" = "Brunca",
+"05" = "Huetar Caribe",
+"06" = "Huetar Norte")) %>%
+mutate(region = as.factor(region)) %>%
+mutate_if(is.character, as.factor) %>%
+mutate(dam = as.factor(dam))
+diseno <- encuesta_mrp  %>%
+as_survey_design(weights = fep)
+x <- c('tidyverse','survey','srvyr')
+lapply(x, require, character.only = TRUE)
+diseno <- encuesta_mrp  %>%
+as_survey_design(weights = fep)
+media_est_srvyr <- svyby(
+~ingreso,
+by = ~region,
+design = diseno,
+svymean
+)
+confint_int <- confint(svyby(formula = ~ingreso,
+by = ~region,
+design = diseno,
+svymean))
+confint_int <- data.table(confint_int, keep.rownames = TRUE)
+colnames(confint_int) <- c("region","min_inter", "max_inter")
+confint_int$ingreso <- media_est_srvyr$ingreso
+rm(list = ls())
+modelo <- readRDS("ingreso/output/modelo.rds")
+# Encuesta quitamos ingreso, lp, li y fep
+encuesta_mrp <- data.table(readRDS("ingreso/datos/encuesta_mrp1.rds")) %>%
+select(-dam,-lp,-li,-fep) %>%
+mutate_if(is.character, as.factor)
+summary(encuesta_mrp)
+head(encuesta_mrp)
+str(encuesta_mrp)
+censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") %>% ungroup() %>%
+select( area, sexo, anoest, discapacidad, edad,
+F182013_stable_lights, X2016_crops.coverfraction,
+X2016_urban.coverfraction, X2016_gHM,
+accessibility, accessibility_walking_only,
+area1, sexo2, edad2, edad3, edad4, edad5, anoest2, anoest3,
+anoest4, discapacidad1, etnia1,
+tiene_alcantarillado, tiene_electricidad,
+tiene_acueducto, tiene_gas, eliminar_basura,
+tiene_internet, piso_tierra,material_paredes,
+material_techo, rezago_escolar, alfabeta,
+hacinamiento,tasa_desocupacion
+)
+sparse_matrix <- sparse.model.matrix( ~ ., data = censo_mrp)[, -1]
+censo_mrp1 <- xgb.DMatrix(data = sparse_matrix)
+pred <- predict(modelo, newdata = censo_mrp1)
+censo_mrp$pred_ingreso <- pred
+saveRDS(pred, file = "ingreso/output/pred.rds")
+rm(list = ls())
+x <- c('tidyverse','survey','srvyr')
+lapply(x, require, character.only = TRUE)
+encuesta_mrp <- readRDS("ingreso/datos/encuesta_mrp1.rds") %>%
+# select(
+#   # -X2016_crops.coverfraction, -X2016_urban.coverfraction,
+#   #      -X2016_gHM, -accessibility, -accessibility_walking_only,
+#        -area1, -sexo2,-edad2,-edad3, -edad4,-edad5,-anoest2,
+#        -anoest3, -anoest4, -discapacidad1,-etnia1,-lp,-li,-pobreza) %>%
+mutate(
+region = recode(dam,
+"01" = "Central",
+"02" = "Chorotega",
+"03" = "Pacífico Central",
+"04" = "Brunca",
+"05" = "Huetar Caribe",
+"06" = "Huetar Norte")) %>%
+mutate(region = as.factor(region)) %>%
+mutate_if(is.character, as.factor) %>%
+mutate(dam = as.factor(dam))
+diseno <- encuesta_mrp  %>%
+as_survey_design(weights = fep)
+media_est_srvyr <- svyby(
+~ingreso,
+by = ~region,
+design = diseno,
+svymean
+)
+confint_int <- confint(svyby(formula = ~ingreso,
+by = ~region,
+design = diseno,
+svymean))
+confint_int <- data.table(confint_int, keep.rownames = TRUE)
+colnames(confint_int) <- c("region","min_inter", "max_inter")
+confint_int$ingreso <- media_est_srvyr$ingreso
+censo_mrp <- censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") %>%
+mutate(
+region = recode(dam,
+"01" = "Central",
+"02" = "Chorotega",
+"03" = "Pacífico Central",
+"04" = "Brunca",
+"05" = "Huetar Caribe",
+"06" = "Huetar Norte")) %>%
+mutate(region = as.factor(region))
+pred <- readRDS("ingreso/output/pred.rds")
+censo_mrp$pred_ingreso <- pred
+ingreso_dam <- censo_mrp %>%
+group_by(region) %>%
+summarise(
+ingreso = mean(pred_ingreso)
+)
+mapping <- rbind(media_est_srvyr[,-3], ingreso_dam)
+estim <- c(rep("Directo", 6), rep("XGBoost", 6))
+mapping <- cbind(mapping, estim)
+mapping %>%
+ggplot(
+aes(x = region,
+y = ingreso)
+) + geom_point(aes(color = estim),size = 2, position = "jitter") + theme_minimal() +
+scale_color_manual(values = c("red","green")) +
+labs(x = "Región de planificación", y = "Ingreso medio", col = "Modelo") +
+geom_errorbar(data = confint_int,aes(x= region, ymin = min_inter,
+ymax = max_inter))
+x <- c('tidyverse','survey','srvyr')
+lapply(x, require, character.only = TRUE)
+diseno <- encuesta_mrp  %>%
+as_survey_design(weights = fep)
+media_est_srvyr <- svyby(
+~ingreso,
+by = ~region,
+design = diseno,
+svymean
+)
+confint_int <- confint(svyby(formula = ~ingreso,
+by = ~region,
+design = diseno,
+svymean))
+confint_int <- data.table(confint_int, keep.rownames = TRUE)
+x <- c('tidyverse','survey','srvyr', 'data.table')
+lapply(x, require, character.only = TRUE)
+confint_int <- confint(svyby(formula = ~ingreso,
+by = ~region,
+design = diseno,
+svymean))
+confint_int <- data.table(confint_int, keep.rownames = TRUE)
+colnames(confint_int) <- c("region","min_inter", "max_inter")
+confint_int$ingreso <- media_est_srvyr$ingreso
+censo_mrp <- censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") %>%
+mutate(
+region = recode(dam,
+"01" = "Central",
+"02" = "Chorotega",
+"03" = "Pacífico Central",
+"04" = "Brunca",
+"05" = "Huetar Caribe",
+"06" = "Huetar Norte")) %>%
+mutate(region = as.factor(region))
+pred <- readRDS("ingreso/output/pred.rds")
+censo_mrp$pred_ingreso <- pred
+ingreso_dam <- censo_mrp %>%
+group_by(region) %>%
+summarise(
+ingreso = mean(pred_ingreso)
+)
+mapping <- rbind(media_est_srvyr[,-3], ingreso_dam)
+estim <- c(rep("Directo", 6), rep("XGBoost", 6))
+mapping <- cbind(mapping, estim)
+mapping %>%
+ggplot(
+aes(x = region,
+y = ingreso)
+) + geom_point(aes(color = estim),size = 2, position = "jitter") + theme_minimal() +
+scale_color_manual(values = c("red","green")) +
+labs(x = "Región de planificación", y = "Ingreso medio", col = "Modelo") +
+geom_errorbar(data = confint_int,aes(x= region, ymin = min_inter,
+ymax = max_inter))
+rm(list = ls())
+x <- c('tidyverse','xgboost','gridExtra','caTools','haven','data.table',
+'Matrix')
+lapply(x, require, character.only = TRUE)
+rm(list = ls())
+set.seed(1998)
+options(scipen=999)
+xgb_train_rmse <- readRDS("ingreso/output/xgb_train_rmse_all.rds")
+grid[which.min(xgb_train_rmse$.), ]
+# Encuesta quitamos ingreso, lp, li y fep
+encuesta_mrp <- data.table(readRDS("ingreso/datos/encuesta_mrp1.rds")) %>%
+select(-dam,-lp,-li,-fep) %>%
+mutate_if(is.character, as.factor)
+summary(encuesta_mrp)
+head(encuesta_mrp)
+str(encuesta_mrp)
+grid <- expand_grid(
+max_depth = seq(6, 10, 1),
+lambda = seq(0, 5, 1),
+lambda_bias = seq(0, 5, 1),
+alpha = seq(0, 5, 1)
+)
+grid[which.min(xgb_train_rmse$.), ]
+grid[which.min(xgb_train_rmse[0:40, ]$.), ]
+xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) +
+geom_line()
+grid[which.min(xgb_train_rmse$.), ]
+xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) +
+geom_line() +
+geom_vline(xintercept = 7, linetype = 2, col = "red") + theme_minimal()
+xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) +
+geom_line() +
+geom_vline(xintercept = 7, linetype = 2, col = "red") +
+xlim(0, 10) +
+theme_minimal()
+xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) +
+geom_line() +
+geom_vline(xintercept = 7, linetype = 2, col = "red") +
+xlim(0, 100) +
+theme_minimal()
+xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) +
+geom_line() +
+geom_vline(xintercept = 100, linetype = 2, col = "red") +
+theme_minimal()
+xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) +
+geom_line() +
+geom_vline(xintercept = 200, linetype = 2, col = "red") +
+theme_minimal()
+xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) +
+geom_line() +
+geom_vline(xintercept = 250, linetype = 2, col = "red") +
+theme_minimal()
+xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) +
+geom_line() +
+geom_vline(xintercept = 220, linetype = 2, col = "red") +
+theme_minimal()
+xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) +
+geom_line() +
+geom_vline(xintercept = 215, linetype = 2, col = "red") +
+theme_minimal()
+xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) +
+geom_line() +
+geom_vline(xintercept = 216, linetype = 2, col = "red") +
+theme_minimal()
+xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) +
+geom_line() +
+geom_vline(xintercept = 7, linetype = 2, col = "red") +
+xlim(0, 216) +
+theme_minimal()
+xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) +
+geom_line() +
+geom_vline(xintercept = 7, linetype = 2, col = "red") +
+# xlim(0, 216) +
+theme_minimal()
+xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) +
+geom_line() +
+geom_vline(xintercept = 7, linetype = 2, col = "red") +
+xlim(215, 250) +
+theme_minimal()
+xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) +
+geom_line() +
+geom_vline(xintercept = 7, linetype = 2, col = "red") +
+xlim(215, 300) +
+theme_minimal()
+View(xgb_train_rmse)
+which.min(xgb_train_rmse$.)
+xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) +
+geom_line() +
+geom_vline(xintercept = 7, linetype = 2, col = "red") +
+# xlim(215, 300) +
+theme_minimal()
+View(grid)
+# Debido a que el XGBoosting solo toma valores numericos, se debe hacer una pequeña transformación para hacerlo funcionar.
+sparse_matrix <- sparse.model.matrix(ingreso ~ ., data = encuesta_mrp)[, -1]
+y = encuesta_mrp[,2]
+encuesta_mrp_m <- xgb.DMatrix(data = sparse_matrix,
+label = as.matrix(sapply(y, as.numeric)))
+corrgram::corrgram(sparse_matrix)
+cor(sparse_matrix)
+set.seed(1998)
+options(scipen=999)

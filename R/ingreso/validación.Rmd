@@ -97,8 +97,8 @@ confint_int$ingreso <- media_est_srvyr$ingreso
 ## Censo lineal
 
 ```{r}
-censo_mrp <- censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") %>% 
-  dplyr::filter(anoest != "98")
+censo_mrp <- censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") %>%
+  dplyr::filter(anoest != "98") |>
       mutate(
   region = recode(dam,
                "01" = "Central",
@@ -107,15 +107,33 @@ censo_mrp <- censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") %>%
                "04" = "Brunca",
                "05" = "Huetar Caribe",
                "06" = "Huetar Norte")) %>%
-  mutate(region = as.factor(region))
+  mutate(region = as.factor(region)) 
 ```
+
+## Censo cat
+```{r}
+censo_mrp <- censo_mrp <- readRDS("ingreso/datos/cens0.rds") %>%
+  dplyr::filter(anoest != "98") |>
+      mutate(
+  region = recode(dam,
+               "01" = "Central",
+               "02" = "Chorotega",
+               "03" = "Pacífico Central",
+               "04" = "Brunca",
+               "05" = "Huetar Caribe",
+               "06" = "Huetar Norte")) %>%
+  mutate(region = as.factor(region)) 
+```
+
 
 ```{r}
 pred <- readRDS("ingreso/output/pred.rds")
+pred_cat <- readRDS("ingreso/output/pred_cat.rds")
 ```
 
 ```{r}
 censo_mrp$pred_ingreso <- pred
+censo_mrp$pred_ingreso <- pred_cat
 ```
 
 ## Calculo ingreso

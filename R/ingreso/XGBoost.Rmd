@@ -71,7 +71,7 @@ encuesta_mrp <- data.table(readRDS("ingreso/datos/encuesta_mrp1.rds")) %>%
   dplyr::rename(
     area_cat = area,
     sexo_cat = sexo,
-    # edad_cat = edad,
+    edad_cat = edad,
     anoest_cat = anoest,
     discapacidad_cat = discapacidad
   )
@@ -635,7 +635,7 @@ rm(list = ls())
 
 ```{r}
 modelo <- readRDS("ingreso/output/modelo_linear.rds")
-modelo <- readRDS("ingreso/output/modelo_linear_edadcat.rds")
+modelo_cat <- readRDS("ingreso/output/modelo_linear_edadcat.rds")
 
 modelo2 <- readRDS("ingreso/output/modelo_tree.rds")
 
@@ -667,6 +667,7 @@ importancia3 <- xgb.importance(
 pi1 <- xgb.ggplot.importance(importancia, rel_to_first = FALSE) 
 pi2 <- xgb.ggplot.importance(importancia2, rel_to_first = FALSE)
   
+pi3 <- xgb.ggplot.importance(importancia3, rel_to_first = FALSE)
 
 grid.arrange(pi1, pi2)
 ```
@@ -767,10 +768,65 @@ pred <- predict(modelo3, newdata = encuesta_mrp_m)
 ```
 
 
--   De acá se puede observar que el modelo con solo las covariables geoespaciales no están brindando suficiente información al modelo, generando así un Error Cuadrático Medio mucho más alto que sus otros competidores.
--   Por otro lado, la ganancia que hay con el modelo con todas las covariables es muy poca con respecto al modelo con solo las covariables del censo.
+```{r}
+
+pred_encuesta <- ggplot(encuesta_mrp) +
+  geom_histogram(
+    aes(x = ingreso, fill = "Observados"),
+    bins = 30,
+    color = "#C55A11",
+    alpha = 0.5,
+    linewidth = 0.2
+  ) +
+  geom_histogram(
+    aes(x = pred, fill = "Predichos"),
+    bins = 30,
+    color = "#008194",
+    alpha = 0.3,
+    linewidth = 0.2
+  )  + 
+  scale_fill_manual(values = c("#C55A11", "#008194")) +  
+  labs(x = "Ingreso", y = " ", fill = "Valores") + 
+  xlim(0, 1000000) +
+  theme_classic() 
+
+  # geom_vline(
+  #   xintercept = 121000,
+  #   linetype = 2,
+  #   col = "red",
+  #   linewidth = 1
+  # )
+
+```
+
+```{r}
+print(encuesta_mrp |>
+  filter(ingreso < 121000) |>
+  group_by(edad_cat, area_cat, anoest_cat, sexo_cat) |>
+  summarise(
+    n = n()
+  ) |> 
+  arrange(desc(n)), n = 76)
+```
+
+
+```{r}
+# Media de ingreso observado
+
+encuesta_mrp |>
+  summarise(
+    `ingreso medio` = mean(ingreso)
+  )
+```
+
+
+- Entre 7 a 12 años de escolaridad, menores de 30 años y mujeres. 
+- El siguiente grupo tiene las mismas características pero son hombres. 
+
 
 ## Predicción con el censo
+
+### Censo con edad continua
 
 ```{r}
 censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") %>% ungroup() %>%
@@ -790,7 +846,7 @@ censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") %>% ungroup() %>%
   dplyr::rename(
   area_cat = area,
   sexo_cat = sexo,
-  edad_cat = edad,
+  # edad_cat = edad,
   anoest_cat = anoest,
   discapacidad_cat = discapacidad
 )
@@ -830,12 +886,16 @@ censo_mrp1 <- xgb.DMatrix(data = sparse_matrix)
 
 ```{r, eval=FALSE}
 pred <- predict(modelo, newdata = censo_mrp1)
+pred_cat <- predict(modelo_cat, newdata = censo_mrp1)
+
 pred2 <- predict(modelo2, newdata = censo_mrp1)
 pred3 <- predict(modelo3, newdata = censo_mrp1)
 ```
 
 ```{r}
 saveRDS(pred, file = "ingreso/output/pred.rds")
+saveRDS(pred_cat, file = "ingreso/output/pred_cat.rds")
+
 saveRDS(pred2, file = "ingreso/output/pred2.rds")
 saveRDS(pred3, file = "ingreso/output/pred3.rds")
 ```

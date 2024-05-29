@@ -43,10 +43,10 @@ options(scipen=999)
 
 ```{r}
 # Encuesta quitamos ingreso, lp, li y fep
-encuesta_mrp <- data.table(readRDS("ingreso/datos/encuesta_mrp.rds")) %>% 
-  dplyr::select(-dam,-lp,-li,-fep) %>% 
+encuesta_mrp <- data.table(readRDS("ingreso/datos/encuesta_mrp.rds")) |> 
+  dplyr::select(-dam,-lp,-li,-fep) |> 
   dplyr::filter(anoest != "98") |>
-  mutate_if(is.character, as.factor) %>% 
+  mutate_if(is.character, as.factor) |> 
   dplyr::rename(
     area_cat = area,
     sexo_cat = sexo,
@@ -64,10 +64,10 @@ str(encuesta_mrp)
 
 ```{r}
 # Encuesta quitamos ingreso, lp, li y fep
-encuesta_mrp <- data.table(readRDS("ingreso/datos/encuesta_mrp1.rds")) %>% 
-  dplyr::select(-dam,-lp,-li,-fep) %>% 
+encuesta_mrp <- data.table(readRDS("ingreso/datos/encuesta_mrp1.rds")) |> 
+  dplyr::select(-dam,-lp,-li,-fep) |> 
   dplyr::filter(anoest != "98") |>
-  mutate_if(is.character, as.factor) %>% 
+  mutate_if(is.character, as.factor) |> 
   dplyr::rename(
     area_cat = area,
     sexo_cat = sexo,
@@ -98,7 +98,7 @@ encuesta_mrp_m <- xgb.DMatrix(data = sparse_matrix,
 # Prueba distribución
 
 ```{r}
-encuesta_mrp %>% ggplot(aes(x = ingreso)) + geom_density(stat = "density", fill = "red", alpha = 0.5) + theme_minimal() 
+encuesta_mrp |> ggplot(aes(x = ingreso)) + geom_density(stat = "density", fill = "red", alpha = 0.5) + theme_minimal() 
 ```
 
 ```{r}
@@ -181,12 +181,12 @@ for(i in 1:nrow(grid)){
 ```
 
 ```{r, eval=FALSE}
-xgb_train_rmse <- xgb_train_rmse %>% 
-  tibble() %>% 
+xgb_train_rmse <- xgb_train_rmse |> 
+  tibble() |> 
   mutate(simulacion = seq(1:1331))
 
-xgb_test_rmse <- xgb_test_rmse %>% 
-  tibble() %>% 
+xgb_test_rmse <- xgb_test_rmse |> 
+  tibble() |> 
   mutate(simulacion = seq(1:1331))
 ````
 
@@ -205,14 +205,14 @@ xgb_train_rmse <- readRDS("ingreso/output/xgb_train_rmse_all_linear_edadcat.rds"
 ```
 
 ```{r}
-xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) + 
+xgb_train_rmse |> ggplot(aes(x = simulacion, y = .)) + 
   geom_line()
 ```
 
 ```{r}
 grid[which.min(xgb_train_rmse$.), ] 
 
-xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) + 
+xgb_train_rmse |> ggplot(aes(x = simulacion, y = .)) + 
   geom_line() +
   geom_vline(xintercept = 61, linetype = 2, col = "red") +
   xlim(0, 200) +
@@ -303,12 +303,12 @@ for(i in 1:nrow(grid)){
 ```
 
 ```{r, eval=FALSE}
-xgb_train_rmse <- xgb_train_rmse %>% 
-  tibble() %>% 
+xgb_train_rmse <- xgb_train_rmse |> 
+  tibble() |> 
   mutate(simulacion = seq(1:1331))
 
-xgb_test_rmse <- xgb_test_rmse %>% 
-  tibble() %>% 
+xgb_test_rmse <- xgb_test_rmse |> 
+  tibble() |> 
   mutate(simulacion = seq(1:1331))
 ````
 
@@ -321,14 +321,14 @@ saveRDS(xgb_test_rmse, file = "ingreso/output/xgb_test_rmse_all_linear.rds")
 ```
 
 ```{r}
-xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) + 
+xgb_train_rmse |> ggplot(aes(x = simulacion, y = .)) + 
   geom_line()
 ```
 
 ```{r}
 grid[which.min(xgb_train_rmse$.), ] 
 
-xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) + 
+xgb_train_rmse |> ggplot(aes(x = simulacion, y = .)) + 
   geom_line() +
   geom_vline(xintercept = 75, linetype = 2, col = "red") +
   xlim(0, 200) +
@@ -390,10 +390,10 @@ rm(list = ls())
 
 ```{r}
 # Encuesta quitamos ingreso, lp, li y fep
-encuesta_mrp <- data.table(readRDS("ingreso/datos/encuesta_mrp1.rds")) %>% 
-  dplyr::select(-dam,-lp,-li,-fep) %>% 
+encuesta_mrp <- data.table(readRDS("ingreso/datos/encuesta_mrp1.rds")) |> 
+  dplyr::select(-dam,-lp,-li,-fep) |> 
   dplyr::filter(anoest != "98") |>
-  mutate_if(is.character, as.factor) %>% 
+  mutate_if(is.character, as.factor) |> 
   dplyr::rename(
     area_cat = area,
     sexo_cat = sexo,
@@ -411,10 +411,10 @@ str(encuesta_mrp)
 
 ```{r}
 # Encuesta quitamos ingreso, lp, li y fep
-encuesta_mrp <- data.table(readRDS("ingreso/datos/encuesta_mrp.rds")) %>% 
-  dplyr::select(-dam,-lp,-li,-fep) %>% 
+encuesta_mrp <- data.table(readRDS("ingreso/datos/encuesta_mrp.rds")) |> 
+  dplyr::select(-dam,-lp,-li,-fep) |> 
   dplyr::filter(anoest != "98") |>
-  mutate_if(is.character, as.factor) %>% 
+  mutate_if(is.character, as.factor) |> 
   dplyr::rename(
     area_cat = area,
     sexo_cat = sexo,
@@ -480,12 +480,12 @@ for(i in 1:nrow(grid)){
 ```
 
 ```{r, eval=FALSE}
-xgb_train_rmse <- xgb_train_rmse %>% 
-  tibble() %>% 
+xgb_train_rmse <- xgb_train_rmse |> 
+  tibble() |> 
   mutate(simulacion = seq(1:4400))
 
-xgb_test_rmse <- xgb_test_rmse %>% 
-  tibble() %>% 
+xgb_test_rmse <- xgb_test_rmse |> 
+  tibble() |> 
   mutate(simulacion = seq(1:4400))
 ````
 
@@ -515,7 +515,7 @@ xgb_train_rmse <- readRDS("ingreso/output/xgb_train_rmse_all_tree_edadcat.rds")
 ```
 
 ```{r}
-xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) + 
+xgb_train_rmse |> ggplot(aes(x = simulacion, y = .)) + 
   geom_line() 
 ```
 
@@ -523,7 +523,7 @@ xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) +
 grid[which.min(xgb_train_rmse$.), ] 
 
 
-xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) + 
+xgb_train_rmse |> ggplot(aes(x = simulacion, y = .)) + 
   geom_line() +
   geom_vline(xintercept = 445, linetype = 2, col = "red") +
   # xlim(2500, 3420) +
@@ -536,7 +536,7 @@ xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) +
 grid[which.min(xgb_train_rmse$.), ] 
 
 
-xgb_train_rmse %>% ggplot(aes(x = simulacion, y = .)) + 
+xgb_train_rmse |> ggplot(aes(x = simulacion, y = .)) + 
   geom_line() +
   geom_vline(xintercept = 2093, linetype = 2, col = "red") +
   # xlim(2500, 3420) +
@@ -829,7 +829,7 @@ encuesta_mrp |>
 ### Censo con edad continua
 
 ```{r}
-censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") %>% ungroup() %>%
+censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") |> ungroup() |>
   dplyr::select(area, sexo, anoest,edad, discapacidad, 
          F182013_stable_lights, X2016_crops.coverfraction,
          X2016_urban.coverfraction, X2016_gHM,
@@ -841,7 +841,7 @@ censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") %>% ungroup() %>%
          tiene_internet, piso_tierra,material_paredes,
          material_techo, rezago_escolar, alfabeta,
          hacinamiento,tasa_desocupacion
-         ) %>%
+         ) |>
   dplyr::filter(anoest != "98") |>
   dplyr::rename(
   area_cat = area,
@@ -854,7 +854,7 @@ censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") %>% ungroup() %>%
 
 
 ```{r}
-censo_mrp <- readRDS("ingreso/datos/cens0.rds") %>% ungroup() %>%
+censo_mrp <- readRDS("ingreso/datos/cens0.rds") |> ungroup() |>
   dplyr::select(area, sexo, anoest,edad, discapacidad, 
          F182013_stable_lights, X2016_crops.coverfraction,
          X2016_urban.coverfraction, X2016_gHM,
@@ -866,7 +866,7 @@ censo_mrp <- readRDS("ingreso/datos/cens0.rds") %>% ungroup() %>%
          tiene_internet, piso_tierra,material_paredes,
          material_techo, rezago_escolar, alfabeta,
          hacinamiento,tasa_desocupacion
-         ) %>%
+         ) |>
   dplyr::filter(anoest != "98") |>
   dplyr::rename(
   area_cat = area,

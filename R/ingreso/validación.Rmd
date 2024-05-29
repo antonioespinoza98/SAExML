@@ -344,12 +344,17 @@ mapping <- cbind(mapping, estim)
 ## Gráfico
 
 ```{r}
+
 p3 <- mapping %>%
-  ggplot(aes(x = region, y = ingreso)) + geom_point(aes(color = estim), size = 2, position = "jitter") +
+  ggplot(aes(x = region, y = ingreso)) + 
+  geom_point(aes(color = estim), size = 2, position = "jitter") +
   scale_color_manual(values = c("red", "green")) +
-  labs(title = "Validación para modelo de árbol", x = "Región de planificación", y = "Ingreso", col = "Modelo") +
-  geom_errorbar(data = confint_int, aes(x = region, ymin = min_inter, ymax = max_inter)) +
+  labs(x = "Región de planificación", y = "Ingreso", col = "Modelo") +
+  geom_errorbar(data = confint_int, 
+                aes(x = region, ymin = min_inter, ymax = max_inter)) +
+  ylim(0,400000) +
   theme_minimal()
+
 ```
 
 
@@ -373,12 +378,27 @@ grid.arrange(p1, p2)
 # Benchmark
 
 ```{r}
-encuesta_mrp <- readRDS("ingreso/datos/encuesta_mrp1.rds")
-censo_mrp <- readRDS("ingreso/datos/censo_mrp.rds")
+rm(list = ls())
+```
+
+
+```{r}
+encuesta_mrp <- readRDS("ingreso/datos/encuesta_mrp.rds") |>
+  dplyr::filter(anoest != "98") |>
+  mutate_if(is.character, as.factor) |> 
+  mutate(dam = as.factor(dam))
+
+censo_mrp <- readRDS("ingreso/datos/cens0.rds") |>
+  dplyr::filter(anoest != "98") |>
+  mutate_if(is.character, as.factor) |> 
+  mutate(dam = as.factor(dam)) |>
+  group_by(dam, area, etnia, sexo, anoest,edad, discapacidad) |>
+  summarise(n = sum(value),
+            .groups = "drop")
 
 statelevel_predictors_df <- readRDS("ingreso/datos/statelevel_predictors_df.rds")
 
-fit <- readRDS("ingreso/output/modelo_tree.rds")
+fit <- readRDS("ingreso/output/modelo_tree_edadcat.rds")
 
 # Poststratification at the National Level --------------------------------
 
@@ -399,38 +419,76 @@ names_sel <- names(poststrat_df)
 poststrat_df <- left_join(poststrat_df, statelevel_predictors_df,
                           by = "dam")
 
-# Posterior_epred returns the posterior estimates for the different subgroups stored in the
-# poststrat_df dataframe.
-sparse_matrix <- sparse.model.matrix( ~ ., data = poststrat_df)[, -1]
+poststrat_df_fit <- poststrat_df |>
+  select(
+    area,
+    sexo,
+    anoest,
+    edad,
+    discapacidad,
+    F182013_stable_lights,
+    X2016_crops.coverfraction,
+    X2016_urban.coverfraction,
+    X2016_gHM,
+    accessibility,
+    accessibility_walking_only,
+    area1,
+    sexo2,
+    edad2,
+    edad3,
+    edad4,
+    edad5,
+    anoest2,
+    anoest3,
+    anoest4,
+    discapacidad1,
+    etnia1,
+    tiene_alcantarillado,
+    tiene_electricidad,
+    tiene_acueducto,
+    tiene_gas,
+    eliminar_basura,
+    tiene_internet,
+    piso_tierra,
+    material_paredes,
+    material_techo,
+    rezago_escolar,
+    alfabeta,
+    hacinamiento,
+    tasa_desocupacion
+  ) |>
+  dplyr::rename(
+    area_cat = area,
+    sexo_cat = sexo,
+    edad_cat = edad,
+    anoest_cat = anoest,
+    discapacidad_cat = discapacidad
+  )
 
-censo_mrp1 <- xgb.DMatrix(data = sparse_matrix)
 
-fit$feature_names
+sparse_matrix <- sparse.model.matrix( ~ ., data = poststrat_df_fit)[, -1]
+
+# encuesta_mrp_m <- xgb.DMatrix(data = sparse_matrix,
+#                               label = as.matrix(sapply(y, as.numeric)))
 
 epred_mat <- predict(fit, newdata = sparse_matrix, 
                      allow.new.levels = TRUE)
 
-length(epred_mat[which(epred_mat < 0)])
-poststrat_df[which(epred_mat < 0),]
-epred_mat[which(epred_mat < 0)] = 1
-
-summary(epred_mat)
-hist(as.numeric(epred_mat))
-
-poststrat_df %<>% select(all_of(names_sel))
 poststrat_df$epred_mat <- epred_mat
 
 # Resultados nacionales ---------------------------------------------------
 ## lineas de pobreza por área
 ## "0" = "Rural", "1" = "Urbana"
 
+
 (lp <- encuesta_mrp %>% select(area,lp) %>% unique())
 poststrat_df %<>% inner_join(lp, by = "area")
 
 
 # Calculo de la pobreza Cepal.  -------------------------------------------
-encuesta_mrp %<>% mutate(pobreza = ingreso/lp)
-poststrat_df %<>% mutate(pobreza = epred_mat/lp)
+encuesta_mrp |> mutate(pobreza = ingreso/lp)
+
+poststrat_df |> mutate(pobreza = epred_mat/lp)
 
 # definiendo diseno muestral
 
@@ -443,6 +501,7 @@ diseno <- encuesta_mrp %>%
 ###     (Gutiérrez - Guerrero, 2022)    ###
 ###########################################
 ###########################################
+
 names_cov <-
   grep(
     pattern =  "^(n|pobreza|ingreso)",
@@ -453,6 +512,7 @@ names_cov <-
 
 names_cov <- names_cov[names_cov %in% names(encuesta_mrp)]
 
+
 num_cat_censo <- apply(poststrat_df[names_cov], MARGIN = 2, function(x)
   length(unique(x)))
 
@@ -462,10 +522,9 @@ num_cat_sample <- apply(encuesta_mrp[names_cov], MARGIN = 2, function(x)
 names_cov <- names_cov[num_cat_censo==num_cat_sample]
 #names_cov <- c("area",   "sexo",   "edad",   "anoest", "depto")
 
-poststrat_df %<>%
+poststrat_df |>
   fastDummies::dummy_cols(select_columns = names_cov,
                           remove_selected_columns = FALSE)
-
 
 estimaciones <-
   map(names_cov ,~ poststrat_df %>% group_by_at(all_of(.x)) %>%
@@ -477,7 +536,6 @@ estimaciones <-
 
 poststrat_df %<>% 
   mutate_at(vars(matches("\\d$")) ,~.*poststrat_df$pobreza)
-
 
 ### total
 totales <- map(names_cov, ~encuesta_mrp %>% group_by_at(all_of(.x)) %>% 
@@ -531,31 +589,6 @@ totales[[3]]$medias-temp[[3]]$medias
 totales[[4]]$medias-temp[[4]]$medias
 totales[[5]]$medias-temp[[5]]$medias
 
-jpeg(file = "CRI/2021/1.Ingreso/Output/Plot_Bench_Pobreza.jpeg")
 hist(poststrat_df$gk)
-dev.off()
-
-saveRDS(poststrat_df %>% select(!matches("_\\d{,2}$")), 
-        "CRI/2021/1.Ingreso/Data/poststrat_df.RDS")
-saveRDS(encuesta_mrp, "CRI/2021/1.Ingreso/Data/encuesta_mrp.RDS")
-
-
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

@@ -161,3 +161,5 @@ cython_debug/
 .Rproj.user/
 .Rhistory
 R/.Rproj.user/
+R/.RData
+R/.Rhistory

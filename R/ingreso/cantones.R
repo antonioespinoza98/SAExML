@@ -109,7 +109,8 @@ guacimo <- c("70601", "70602", "70603", "70604", "70605")
 # Extraemos el censo y de una vez creamos una columna nueva llamada 
 # canton, donde se crean los cantones en base a los distritos
 
-censo_mrp <- censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") %>% 
+censo_mrp <- censo_mrp <- readRDS("ingreso/datos/cens0.rds") %>%
+  filter(anoest != "98") %>% 
   mutate(
     canton = 
       case_when(
@@ -205,7 +206,7 @@ censo_mrp <- censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") %>%
 # Predicción realizada ----------------------------------------------------
 
 # Cargamos la predicción realizada en el archivo de XGBoost.Rmd
-pred <- readRDS("ingreso/output/pred.rds")
+pred <- readRDS("ingreso/output/pred3.rds")
 # se lo agregamos al data frame del censo
 censo_mrp$pred_ingreso <- pred
 
@@ -220,6 +221,7 @@ ingreso_cantonal <- censo_mrp %>%
     ingreso_medio = mean(pred_ingreso)
   )
 
+saveRDS(ingreso_cantonal, "ingreso/output/ingreso_cantonal.rds")
 
 # BASE RESUMEN PARA LAS REGIONES DE PLANIFICACIÓN ECONÓMICA  --------------
 
@@ -229,7 +231,8 @@ ingreso_cantonal <- censo_mrp %>%
 # se hace un left join con el shapefile, por lo tanto el nombre de la 
 #columna en común debe ser igual a la del otro archivo. 
 # para evitar recodings, se hace desde acá.
-censo_mrp <- censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") %>% 
+censo_mrp <- censo_mrp <- readRDS("ingreso/datos/cens0.rds") %>%
+  filter(anoest != "98") %>% 
   mutate(
   region = recode(dam,
                "01" = "Central",
@@ -239,7 +242,7 @@ censo_mrp <- censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") %>%
                "05" = "Huetar Caribe",
                "06" = "Huetar Norte"))
 # volvemos a cargar la predicción y se la agregamos a la base del censo  
-pred <- readRDS("ingreso/output/pred.rds")
+pred <- readRDS("ingreso/output/pred3.rds")
 censo_mrp$pred_ingreso <- pred
 
 # Creamos una base de datos resumen para las regiones de planificación

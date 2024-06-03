@@ -9,11 +9,6 @@ editor_options:
   chunk_output_type: console
 ---
 
-De acuerdo a *Poverty Mapping in the Age of Machine Learning* se prueban tres modelos de XGBoosting machines, los cuales son:
-
--   Modelo XGBoost Machine con covariables de geoubicación únicamente.
--   Modelo XGBoost Machine con covariables censales únicamente.
--   Modelo XGBoost Machine con todas las covariables.
 
 ```{r}
 rm(list = ls())

@@ -3,6 +3,7 @@ channels:
   - conda-forge
   - defaults
 dependencies:
+  - _py-xgboost-mutex=2.0=cpu_0
   - asttokens=2.4.1=pyhd8ed1ab_0
   - blas=1.0=mkl
   - bottleneck=1.3.7=py311hd7041d2_0
@@ -40,6 +41,7 @@ dependencies:
   - ipykernel=6.29.3=pyha63f2e9_0
   - ipython=8.22.2=pyh7428d3b_0
   - jedi=0.19.1=pyhd8ed1ab_0
+  - joblib=1.4.0=py311haa95532_0
   - jpeg=9e=h2bbff1b_1
   - jupyter_client=8.6.0=pyhd8ed1ab_0
   - jupyter_core=5.7.1=py311h1ea47a8_0
@@ -61,6 +63,7 @@ dependencies:
   - libsodium=1.0.18=h8d14728_1
   - libtiff=4.5.1=hd77b12b_0
   - libwebp-base=1.3.2=h2bbff1b_0
+  - libxgboost=2.0.3=h5da7b33_0
   - libxml2=2.10.4=h0ad7f3c_1
   - libzlib=1.2.13=hcfcfb64_5
   - lz4-c=1.9.4=h2bbff1b_0
@@ -83,8 +86,9 @@ dependencies:
   - numpy=1.26.4=py311hdab7c0b_0
   - numpy-base=1.26.4=py311hd01c5d8_0
   - openjpeg=2.4.0=h4fc8c34_0
-  - openssl=3.0.13=h2bbff1b_0
+  - openssl=3.0.13=h2bbff1b_2
   - packaging=23.1=py311haa95532_0
+  - pandas=2.2.2=py311hf63dbb6_0
   - pango=1.50.7=h78c2152_0
   - parso=0.8.3=pyhd8ed1ab_0
   - patsy=0.5.3=py311haa95532_0
@@ -98,6 +102,7 @@ dependencies:
   - prompt-toolkit=3.0.42=pyha770c72_0
   - psutil=5.9.0=py311h2bbff1b_0
   - pure_eval=0.2.2=pyhd8ed1ab_0
+  - py-xgboost=2.0.3=py311haa95532_0
   - pygments=2.17.2=pyhd8ed1ab_0
   - pyparsing=3.0.9=py311haa95532_0
   - pyqt=5.15.10=py311hd77b12b_0
@@ -111,6 +116,7 @@ dependencies:
   - pywin32=305=py311h2bbff1b_0
   - pyzmq=25.1.2=py311hd77b12b_0
   - qt-main=5.15.2=h19c9488_10
+  - scikit-learn=1.4.2=py311hf62ec03_1
   - scipy=1.11.4=py311hc1ccb85_0
   - setuptools=68.2.2=py311haa95532_0
   - sip=6.7.12=py311hd77b12b_0
@@ -119,6 +125,7 @@ dependencies:
   - stack_data=0.6.2=pyhd8ed1ab_0
   - statsmodels=0.14.0=py311hd7041d2_0
   - tbb=2021.8.0=h59b6b97_0
+  - threadpoolctl=2.2.0=pyh0d69192_0
   - tk=8.6.12=h2bbff1b_0
   - tornado=6.3.3=py311h2bbff1b_0
   - traitlets=5.14.1=pyhd8ed1ab_0
@@ -130,16 +137,10 @@ dependencies:
   - vs2015_runtime=14.38.33130=hcb4865c_18
   - wcwidth=0.2.13=pyhd8ed1ab_0
   - wheel=0.41.2=py311haa95532_0
+  - xgboost=2.0.3=py311haa95532_0
   - xz=5.4.6=h8cc25b3_0
   - zeromq=4.3.5=hd77b12b_0
   - zipp=3.17.0=pyhd8ed1ab_0
   - zlib=1.2.13=hcfcfb64_5
   - zstd=1.5.5=hd43e919_0
-  - pip:
-      - joblib==1.3.2
-      - pandas==1.5.3
-      - python-graphviz==0.20.3
-      - samplics==0.4.11
-      - scikit-learn==1.4.1.post1
-      - threadpoolctl==3.3.0
-prefix: C:\Users\mespinoza\AppData\Local\anaconda3\envs\saenv
+prefix: C:\Users\marqu\anaconda3\envs\saenv

@@ -34,17 +34,15 @@ options(scipen=999)
 
 # Datos 
 
-## Datos con edad categorizada
-
 ```{r}
 # Encuesta quitamos ingreso, lp, li y fep
-encuesta_mrp <- data.table(readRDS("ingreso/datos/encuesta_mrp.rds")) |> 
+encuesta_mrp <- data.table(readRDS("ingreso/datos/encuesta_mrp1.rds")) |> 
   dplyr::select(-dam,-li,-fep) |> 
   dplyr::filter(anoest != "98") |>
   dplyr::rename(
     area_cat = area,
     sexo_cat = sexo,
-    edad_cat = edad,
+    # edad_cat = edad,
     anoest_cat = anoest,
     discapacidad_cat = discapacidad
   ) |>
@@ -56,40 +54,6 @@ encuesta_mrp <- data.table(readRDS("ingreso/datos/encuesta_mrp.rds")) |>
 summary(encuesta_mrp)
 head(encuesta_mrp)
 str(encuesta_mrp)
-```
-
-## Datos edad lineal
-
-```{r}
-# Encuesta quitamos ingreso, lp, li y fep
-encuesta_mrp <- data.table(readRDS("ingreso/datos/encuesta_mrp1.rds")) |> 
-  dplyr::select(-dam,-lp,-li,-fep) |> 
-  dplyr::filter(anoest != "98") |>
-  mutate_if(is.character, as.factor) |> 
-  dplyr::rename(
-    area_cat = area,
-    sexo_cat = sexo,
-    edad_cat = edad,
-    anoest_cat = anoest,
-    discapacidad_cat = discapacidad
-  )
-
-summary(encuesta_mrp)
-head(encuesta_mrp)
-str(encuesta_mrp)
-```
-
-
-## Matriz
-
-```{r}
-# Debido a que el XGBoosting solo toma valores numericos, se debe hacer una pequeña transformación para hacerlo funcionar.
-
-sparse_matrix <- sparse.model.matrix(ingreso ~ ., data = encuesta_mrp)[, -1]
-y = encuesta_mrp[,2]
-
-encuesta_mrp_m <- xgb.DMatrix(data = sparse_matrix,
-                              label = as.matrix(sapply(y, as.numeric)))
 ```
 
 # Modelo GBtree
@@ -107,7 +71,6 @@ rm(list = ls())
 sparse_matrix <- sparse.model.matrix(pobreza ~ ., data = encuesta_mrp)[, -1]
  y = encuesta_mrp$pobreza
 ```
-
 
 ```{r, eval=FALSE}
 grid <- expand_grid(
@@ -193,8 +156,6 @@ xgb_train_auc |> ggplot(aes(x = simulacion, y = xgb_train_auc)) +
 
 vamos a ajustar el modelo con los siguientes hiperparámetros:
 
-* modelo edad categórica
-
 - eta = 0.5
 - depth = 8
 - lambda = 1
@@ -260,66 +221,224 @@ pi1 <- xgb.ggplot.importance(importancia, rel_to_first = FALSE)
 
 ### Gtree 
 
+Para hacer la validación del modelo, vamos a aplicar el método de validación clásico de Machine Learning. Por lo que vamos a hacer un set de datos de train y test para eventualmente poder validarlo con la tabla de confusión y con la Curva de ROC. Una vez realizado esto, se utiliza el modelo completo para la predicción a nivel de censo.
+
+- eta = 0.5
+- depth = 8
+- lambda = 1
+- alpha = 0
+
 ```{r}
-pred <- predict(modelo2, newdata = encuesta_mrp_m)
-pred <- predict(modelo3, newdata = encuesta_mrp_m)
+n <- nrow(encuesta_mrp)
+s <- sample(1:n, round(0.8*n))
+train <- encuesta_mrp[s,]
+test <- encuesta_mrp[-s,]
+```
+
+```{r}
+# Debido a que el XGBoosting solo toma valores numericos, se debe hacer una pequeña transformación para hacerlo funcionar.
+
+sparse_matrix <- sparse.model.matrix(pobreza ~ ., data = train)[, -1]
+ y = train$pobreza
+```
+
+```{r, eval=FALSE}
+grid <- expand_grid(
+  eta = seq(0.30, 1, 0.10),
+  max_depth = seq(6, 10, 1),
+  # subsample = seq(0.5, 1, 0.10),
+  lambda = seq(1, 5, 1),
+  alpha = seq(0, 5, 1)
+)
 ```
 
 
 ```{r}
 
-pred_encuesta <- ggplot(encuesta_mrp) +
-  geom_histogram(
-    aes(x = ingreso, fill = "Observados"),
-    bins = 30,
-    color = "#C55A11",
-    alpha = 0.5,
-    linewidth = 0.2
-  ) +
-  geom_histogram(
-    aes(x = pred, fill = "Predichos"),
-    bins = 30,
-    color = "#008194",
-    alpha = 0.3,
-    linewidth = 0.2
-  )  + 
-  scale_fill_manual(values = c("#C55A11", "#008194")) +  
-  labs(x = "Ingreso", y = " ", fill = "Valores") + 
-  xlim(0, 1000000) +
-  theme_classic() 
-
-  # geom_vline(
-  #   xintercept = 121000,
-  #   linetype = 2,
-  #   col = "red",
-  #   linewidth = 1
-  # )
-
-```
-
-```{r}
-print(encuesta_mrp |>
-  filter(ingreso < 121000) |>
-  group_by(edad_cat, area_cat, anoest_cat, sexo_cat) |>
-  summarise(
-    n = n()
-  ) |> 
-  arrange(desc(n)), n = 76)
-```
+xgb_train_auc <- numeric(nrow(grid))
+xgb_test_auc <- numeric(nrow(grid))
 
 
-```{r}
-# Media de ingreso observado
-
-encuesta_mrp |>
-  summarise(
-    `ingreso medio` = mean(ingreso)
+for(i in 1:nrow(grid)){
+  xgb_untuned = xgb.cv(
+    data = sparse_matrix,
+    label = y,
+    booster = "gbtree",
+    eta = grid$eta[i],
+    max_depth = grid$max_depth[i],
+    # subsample = grid$subsample[i],
+    lambda = grid$lambda[i],
+    alpha = grid$alpha[i],
+    objective = "binary:logistic",
+    eval_metric = "auc",
+    nrounds = 1000,
+    early_stopping_rounds = 3, # training with a validation set will stop if the performance does not improve for k rounds (3)
+    nfold = 5
   )
+  
+  xgb_train_auc[i] <-
+    xgb_untuned$evaluation_log$train_auc_mean[xgb_untuned$best_iteration]
+  xgb_test_auc[i] <-
+    xgb_untuned$evaluation_log$test_auc_mean[xgb_untuned$best_iteration]
+  
+  cat(i, "\n")
+}
+```
+
+```{r, eval=FALSE}
+xgb_train_auc <- xgb_train_auc |> 
+  tibble() |> 
+  mutate(simulacion = seq(1:1200))
+
+xgb_test_auc <- xgb_test_auc |> 
+  tibble() |> 
+  mutate(simulacion = seq(1:1200))
+````
+
+```{r}
+xgb_train_auc |> ggplot(aes(x = simulacion, y = xgb_train_auc)) + 
+  geom_line() 
+```
+
+```{r}
+grid[which.max(xgb_train_auc$xgb_train_auc), ] 
+
+
+xgb_train_auc |> ggplot(aes(x = simulacion, y = xgb_train_auc)) + 
+  geom_line() +
+  geom_vline(xintercept = 277, linetype = 2, col = "red") +
+  geom_hline(yintercept = 0.7764942, linetype = 2, col = "red") +
+  theme_minimal() 
 ```
 
 
-- Entre 7 a 12 años de escolaridad, menores de 30 años y mujeres. 
-- El siguiente grupo tiene las mismas características pero son hombres. 
+
+```{r, eval=FALSE}
+modelo <- xgboost(
+  booster = "gbtree",
+  objective = "binary:logistic",
+  eta = 0.4,
+  max_depth = 10,
+  lambda = 2,
+  alpha = 0,
+  nrounds = 1000,
+  early_stopping_rounds = 3,
+  eval_metric = "auc",
+  data = sparse_matrix,
+  label = y
+)
+
+ggplot(modelo$evaluation_log, aes(
+  x = iter,
+  y = train_auc
+)) + geom_line() 
+```
+
+```{r}
+sparse_matrix <- sparse.model.matrix(pobreza ~ ., data = test)[, -1]
+
+pred <- predict(modelo, newdata = sparse_matrix)
+```
+
+```{r}
+test$pred <- as.numeric(pred > 0.5) 
+```
+
+### Validación Cruzada
+
+```{r}
+confusion.mat <- table(test$pobreza, test$pred)
+dimnames(confusion.mat) <- list("Reales" = c("PP", "FN"), "predichos" = c("PN", "FP"))
+
+confusion.mat
+```
+
+- Los FP es la proporción de casos negativos que fueron clasificados como positivos. Esto quiere decir que 58 personas ~1% como pobres cuando en realidad no lo son. 
+Mientras que para el caso de FN, es la proporción de casos positivos que fueron clasificados como negativos. Esto quiere decir que 998 ~17% personas fueron clasificadas no pobres cuando en realidad si lo son. 
+
+### KS
+
+```{r}
+KS = function(pred,y) {
+  predictions = prediction(pred,y) 
+  des = performance(predictions,"tpr","fpr")    
+  ks = max(attributes(des)$y.values[[1]]*100 - 
+           attributes(des)$x.values[[1]]*100)
+  return(ks)
+}
+```
+
+```{r}
+KS(test$pred, test$pobreza)
+```
+
+```{r}
+eval <- function(y, pred){
+  confu = table(y, pred)
+  e = 1 - sum(diag(confu))/sum(confu)
+  falsos = 1 - diag(confu)/apply(confu, 1, sum)
+  error = c(e, falsos)*100
+  auc = curvaROC(pred, y)$auc
+  ks = KS(pred, y)
+  indicadores = c(error, auc, KS)
+  names(indicadores) = c("e","FP","FN","AUC","KS")
+  return(list(Matriz = confu, indicadores = indicadores))
+}
+```
+
+
+```{r}
+eval(test$pobreza, as.numeric(test$pred))
+```
+
+
+### Curva de ROC
+
+```{r}
+predict1 <- prediction(as.numeric(test$pred), test$pobreza)
+attributes(performance(predict1, "auc"))$y.values[[1]]*100
+```
+
+
+```{r}
+library(ROCR)
+library(plotly)
+curvaROC = function(pred,y, grafico = F) {
+  predict = prediction(pred,y) 
+  auc = attributes(performance(predict,"auc"))$y.values[[1]]*100
+  des = performance(predict,"tpr","fpr")
+  p = NULL
+  if(grafico){
+    FP = attributes(des)$x.values[[1]]*100
+    PP = attributes(des)$y.values[[1]]*100
+    p <- plot_ly(x = FP, y = FP, name = 'Línea No Discrimina', 
+                 type = 'scatter', mode = 'lines',
+                 line = list(color = 'rgba(0, 0, 0, 1)', 
+                             width = 4, dash = 'dot'),
+                 fill = 'tozeroy',  fillcolor = 'rgba(0, 0, 0, 0)') %>% 
+      add_trace(y = PP, name = paste('Curva ROC (AUC = ', round(auc,3),')', sep =""), 
+                line = list(color = 'rgba(0, 0, 255, 1)', width = 4, 
+                dash = 'line'),  fillcolor = 'rgba(0, 0, 255, 0.2)')%>%
+      layout(title = "Curva ROC",
+             xaxis = list(title = "<b>Falsos Positivos (%)<b>"),
+             yaxis = list (title = "<b>Precisión Positiva (%)<b>"))
+  }
+  return(list(auc = auc,grafico = p))
+}
+```
+
+```{r}
+xgb.plot.tree(model = modelo, trees = 235)
+```
+
+
+```{r}
+curvaROC(test$pred, test$pobreza, grafico = TRUE)
+```
+
+- La curva de ROC muestra el rendimiento de un modelo de clasificación en todos los umbrales de clasificación. 
+Esta permite ver la precisión positiva contra los falsos positivos en diferentes umbrales. Lo esperado es tener más falsos positivos y más precisión positiva. 
+Una forma de interpretar esto es como la probabilidad de que el modelo clasifique un ejemplo positivo aleatorio más alto que un ejemplo negativo aleatorio. Como en este caso el valor del AUC es de 0.51, esto es como tomar la decisión de clasificación con una moneda al aire. Y por lo tanto, el modelo es pobre al no ser predictivo. 
 
 
 ## Predicción con el censo
@@ -363,26 +482,22 @@ sparse_matrix <- sparse.model.matrix( ~ ., data = censo_mrp)[, -1]
 ```
 
 ```{r, eval=FALSE}
-pred <- predict(modelo, newdata = sparse_matrix, type = "class") > 0.5
+pred <- predict(modelo, newdata = sparse_matrix)
 ```
 
 ```{r}
 saveRDS(pred, file = "pobreza/output/pred.rds")
 ```
 
-
 ```{r}
-censo_mrp$pred <- pred
+pred <- readRDS("pobreza/output/pred.rds")
 ```
 
 ```{r}
+censo_mrp$pred <- as.numeric(pred > 0.5)
+```
 
-censo_mrp <- censo_mrp |>
-  as.character(pred) |>
-  mutate(pred,
-         recode(pred,
-                TRUE ~ "1",
-                FALSE ~ "0"))
+```{r}
 
 ```
 

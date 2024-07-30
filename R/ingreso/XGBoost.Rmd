@@ -410,33 +410,18 @@ str(encuesta_mrp)
 #### Datos con edad agregada
 
 ```{r}
-# Encuesta quitamos ingreso, lp, li y fep
-encuesta_mrp <- data.table(readRDS("ingreso/datos/encuesta_mrp.rds")) |> 
-  dplyr::select(-dam,-lp,-li,-fep) |> 
-  dplyr::filter(anoest != "98") |>
-  mutate_if(is.character, as.factor) |> 
-  dplyr::rename(
-    area_cat = area,
-    sexo_cat = sexo,
-    edad_cat = edad,
-    anoest_cat = anoest,
-    discapacidad_cat = discapacidad
-  )
-
-summary(encuesta_mrp)
-head(encuesta_mrp)
-str(encuesta_mrp)
+encuesta_df_agg <- readRDS("ingreso/datos/encuesta_df_agg.rds") |>
+  mutate_if(is.character, as.factor) |>
+  dplyr::select(-dam, -area, -sexo, -anoest, -edad, -n)
 ```
 
 
 ```{r}
 # Debido a que el XGBoosting solo toma valores numericos, se debe hacer una pequeña transformación para hacerlo funcionar.
 
-sparse_matrix <- sparse.model.matrix(ingreso ~ ., data = encuesta_mrp)[, -1]
- y = encuesta_mrp[,2]
+sparse_matrix <- sparse.model.matrix(ingreso ~ ., data = encuesta_df_agg)[, -1]
 
-encuesta_mrp_m <- xgb.DMatrix(data = sparse_matrix,
-                              label = as.matrix(sapply(y, as.numeric)))
+ y = encuesta_df_agg$ingreso
 ```
 
 
@@ -444,10 +429,21 @@ encuesta_mrp_m <- xgb.DMatrix(data = sparse_matrix,
 grid <- expand_grid(
   eta = seq(0.30, 1, 0.10),
   max_depth = seq(6, 10, 1),
+  # min_child_weight = seq(1, 20, 5),
   lambda = seq(1, 10, 1),
   alpha = seq(0, 10, 1)
 )
 ```
+
+```{r}
+sqrterror <- function(preds, dtrain){
+  labels <- xgboost::getinfo(dtrain, "label")
+  grad <- preds - labels
+  hess <- rep(1, length(grad))
+  return(list(grad = grad, hess = hess))
+}
+```
+
 
 ```{r}
 
@@ -457,14 +453,16 @@ xgb_test_rmse <- numeric(nrow(grid))
 
 for(i in 1:nrow(grid)){
   xgb_untuned = xgb.cv(
-    data = encuesta_mrp_m,
+    data = sparse_matrix,
+    label = y,
     booster = "gbtree",
     eta = grid$eta[i],
     max_depth = grid$max_depth[i],
+    # min_child_weight = grid$min_child_weight[i],
     lambda = grid$lambda[i],
-    alpha = grid$alpha,
-    objective = "reg:squarederror",
-    eval_metric = "rmse",
+    alpha = grid$alpha[i],
+    objective = sqrterror,
+    # eval_metric = "rmse",
     nrounds = 1000,
     early_stopping_rounds = 3, # training with a validation set will stop if the performance does not improve for k rounds (3)
     nfold = 5
@@ -497,51 +495,28 @@ saveRDS(xgb_test_rmse, file = "ingreso/output/xgb_test_rmse_all_tree.rds")
 
 ```
 
-```{r}
-#Guardamos las iteraciones para el primer modelo de la validación cruzada
-
-saveRDS(xgb_train_rmse, file = "ingreso/output/xgb_train_rmse_all_tree_edadcat.rds")
-saveRDS(xgb_test_rmse, file = "ingreso/output/xgb_test_rmse_all_tree_edadcat.rds")
-
-```
-
 
 ```{r}
 xgb_train_rmse <- readRDS("ingreso/output/xgb_train_rmse_all_tree.rds")
 ```
 
-```{r}
-xgb_train_rmse <- readRDS("ingreso/output/xgb_train_rmse_all_tree_edadcat.rds")
-```
 
 ```{r}
-xgb_train_rmse |> ggplot(aes(x = simulacion, y = .)) + 
+xgb_train_rmse |> ggplot(aes(x = simulacion, y = xgb_train_rmse)) + 
   geom_line() 
 ```
 
 ```{r}
-grid[which.min(xgb_train_rmse$.), ] 
+grid[which.min(xgb_train_rmse$xgb_train_rmse), ] 
 
 
-xgb_train_rmse |> ggplot(aes(x = simulacion, y = .)) + 
+xgb_train_rmse |> ggplot(aes(x = simulacion, y = xgb_train_rmse)) + 
   geom_line() +
-  geom_vline(xintercept = 445, linetype = 2, col = "red") +
+  geom_vline(xintercept = 3032, linetype = 2, col = "red") +
   # xlim(2500, 3420) +
   theme_minimal() 
 ```
 
-#### Modelo con edad agregada
-
-```{r}
-grid[which.min(xgb_train_rmse$.), ] 
-
-
-xgb_train_rmse |> ggplot(aes(x = simulacion, y = .)) + 
-  geom_line() +
-  geom_vline(xintercept = 2093, linetype = 2, col = "red") +
-  # xlim(2500, 3420) +
-  theme_minimal() 
-```
 
 
 #### Modelo

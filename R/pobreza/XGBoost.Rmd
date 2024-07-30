@@ -18,7 +18,7 @@ rm(list = ls())
 
 ```{r}
 x <- c('tidyverse','xgboost','gridExtra','caTools','haven','data.table',
-       'Matrix','fitdistrplus')
+       'Matrix','fitdistrplus','ROCR','rattle','caret')
 lapply(x, require, character.only = TRUE)
 ```
 
@@ -76,7 +76,7 @@ sparse_matrix <- sparse.model.matrix(pobreza ~ ., data = encuesta_mrp)[, -1]
 grid <- expand_grid(
   eta = seq(0.30, 1, 0.10),
   max_depth = seq(6, 10, 1),
-  # subsample = seq(0.5, 1, 0.10),
+  subsample = seq(0.5, 1, 0.5),
   lambda = seq(1, 5, 1),
   alpha = seq(0, 5, 1)
 )
@@ -84,8 +84,8 @@ grid <- expand_grid(
 
 ```{r}
 
-xgb_train_auc <- numeric(nrow(grid))
-xgb_test_auc <- numeric(nrow(grid))
+xgb_train_rmse <- numeric(nrow(grid))
+xgb_test_rmse <- numeric(nrow(grid))
 
 
 for(i in 1:nrow(grid)){
@@ -95,60 +95,59 @@ for(i in 1:nrow(grid)){
     booster = "gbtree",
     eta = grid$eta[i],
     max_depth = grid$max_depth[i],
-    # subsample = grid$subsample[i],
+    subsample = grid$subsample[i],
     lambda = grid$lambda[i],
     alpha = grid$alpha[i],
     objective = "binary:logistic",
-    eval_metric = "auc",
+    eval_metric = "rmse",
     nrounds = 1000,
     early_stopping_rounds = 3, # training with a validation set will stop if the performance does not improve for k rounds (3)
     nfold = 5
   )
   
-  xgb_train_auc[i] <-
-    xgb_untuned$evaluation_log$train_auc_mean[xgb_untuned$best_iteration]
-  xgb_test_auc[i] <-
-    xgb_untuned$evaluation_log$test_auc_mean[xgb_untuned$best_iteration]
+  xgb_train_rmse[i] <-
+    xgb_untuned$evaluation_log$train_rmse_mean[xgb_untuned$best_iteration]
+  xgb_test_rmse[i] <-
+    xgb_untuned$evaluation_log$test_rmse_mean[xgb_untuned$best_iteration]
   
   cat(i, "\n")
 }
 ```
 
 ```{r, eval=FALSE}
-xgb_train_auc <- xgb_train_auc |> 
+xgb_train_rmse <- xgb_train_rmse |> 
   tibble() |> 
-  mutate(simulacion = seq(1:1200))
+  mutate(simulacion = seq(1:2400))
 
-xgb_test_auc <- xgb_test_auc |> 
+xgb_test_rmse <- xgb_test_rmse |> 
   tibble() |> 
-  mutate(simulacion = seq(1:1200))
+  mutate(simulacion = seq(1:2400))
 ````
 
 ```{r}
 #Guardamos las iteraciones para el primer modelo de la validación cruzada
 
-saveRDS(xgb_train_auc, file ="pobreza/output/xgb_train_auc.rds")
-saveRDS(xgb_test_auc, file = "pobreza/output/xgb_test_auc.rds")
+saveRDS(xgb_train_rmse, file ="pobreza/output/xgb_train_rmse.rds")
+saveRDS(xgb_test_rmse, file = "pobreza/output/xgb_test_rmse.rds")
 
 ```
 
 ```{r}
-xgb_train_auc <- readRDS("ingreso/output/xgb_train_auc.rds")
+xgb_train_rmse <- readRDS("pobreza/output/xgb_train_rmse.rds")
 ```
 
 ```{r}
-xgb_train_auc |> ggplot(aes(x = simulacion, y = xgb_train_auc)) + 
+xgb_train_rmse |> ggplot(aes(x = simulacion, y = xgb_train_rmse)) + 
   geom_line() 
 ```
 
 ```{r}
-grid[which.max(xgb_train_auc$xgb_train_auc), ] 
+grid[which.min(xgb_train_rmse$xgb_train_rmse), ] 
 
 
-xgb_train_auc |> ggplot(aes(x = simulacion, y = xgb_train_auc)) + 
+xgb_train_rmse |> ggplot(aes(x = simulacion, y = xgb_train_rmse)) + 
   geom_line() +
-  geom_vline(xintercept = 361, linetype = 2, col = "red") +
-  geom_hline(yintercept = 0.7522102, linetype = 2, col = "red") +
+  geom_vline(xintercept = 1171, linetype = 2, col = "red") +
   theme_minimal() 
 ```
 
@@ -156,8 +155,9 @@ xgb_train_auc |> ggplot(aes(x = simulacion, y = xgb_train_auc)) +
 
 vamos a ajustar el modelo con los siguientes hiperparámetros:
 
-- eta = 0.5
-- depth = 8
+- eta = 0.3
+- depth = 10
+- subsample = 1
 - lambda = 1
 - alpha = 0
 
@@ -165,25 +165,26 @@ vamos a ajustar el modelo con los siguientes hiperparámetros:
 modelo <- xgboost(
   booster = "gbtree",
   objective = "binary:logistic",
-  eta = 0.5,
-  max_depth = 8,
+  eta = 0.3,
+  max_depth = 10,
+  subsample = 1,
   lambda = 1,
   alpha = 0,
   nrounds = 1000,
   early_stopping_rounds = 3,
-  eval_metric = "auc",
+  eval_metric = "rmse",
   data = sparse_matrix,
   label = y
 )
 
 ggplot(modelo$evaluation_log, aes(
   x = iter,
-  y = train_auc
+  y = train_rmse
 )) + geom_line() 
 
 
 # Valor minimo
-modelo$evaluation_log[which.max(modelo$evaluation_log$train_auc), ]
+modelo$evaluation_log[which.min(modelo$evaluation_log$train_rmse), ]
 
 ggplot(modelo$evaluation_log, aes(
   x = iter,
@@ -246,7 +247,7 @@ sparse_matrix <- sparse.model.matrix(pobreza ~ ., data = train)[, -1]
 grid <- expand_grid(
   eta = seq(0.30, 1, 0.10),
   max_depth = seq(6, 10, 1),
-  # subsample = seq(0.5, 1, 0.10),
+  subsample = seq(0.5, 1, 0.5),
   lambda = seq(1, 5, 1),
   alpha = seq(0, 5, 1)
 )
@@ -255,8 +256,8 @@ grid <- expand_grid(
 
 ```{r}
 
-xgb_train_auc <- numeric(nrow(grid))
-xgb_test_auc <- numeric(nrow(grid))
+xgb_train_rmse <- numeric(nrow(grid))
+xgb_test_rmse <- numeric(nrow(grid))
 
 
 for(i in 1:nrow(grid)){
@@ -266,51 +267,49 @@ for(i in 1:nrow(grid)){
     booster = "gbtree",
     eta = grid$eta[i],
     max_depth = grid$max_depth[i],
-    # subsample = grid$subsample[i],
+    subsample = grid$subsample[i],
     lambda = grid$lambda[i],
     alpha = grid$alpha[i],
     objective = "binary:logistic",
-    eval_metric = "auc",
+    eval_metric = "rmse",
     nrounds = 1000,
     early_stopping_rounds = 3, # training with a validation set will stop if the performance does not improve for k rounds (3)
     nfold = 5
   )
   
-  xgb_train_auc[i] <-
-    xgb_untuned$evaluation_log$train_auc_mean[xgb_untuned$best_iteration]
-  xgb_test_auc[i] <-
-    xgb_untuned$evaluation_log$test_auc_mean[xgb_untuned$best_iteration]
+  xgb_train_rmse[i] <-
+    xgb_untuned$evaluation_log$train_rmse_mean[xgb_untuned$best_iteration]
+  xgb_test_rmse[i] <-
+    xgb_untuned$evaluation_log$test_rmse_mean[xgb_untuned$best_iteration]
   
   cat(i, "\n")
 }
 ```
 
 ```{r, eval=FALSE}
-xgb_train_auc <- xgb_train_auc |> 
+xgb_train_rmse <- xgb_train_rmse |> 
   tibble() |> 
-  mutate(simulacion = seq(1:1200))
+  mutate(simulacion = seq(1:2400))
 
-xgb_test_auc <- xgb_test_auc |> 
+xgb_test_rmse <- xgb_test_rmse |> 
   tibble() |> 
-  mutate(simulacion = seq(1:1200))
+  mutate(simulacion = seq(1:2400))
 ````
 
 ```{r}
-xgb_train_auc |> ggplot(aes(x = simulacion, y = xgb_train_auc)) + 
+xgb_train_rmse |> ggplot(aes(x = simulacion, y = xgb_train_rmse)) + 
   geom_line() 
 ```
 
 ```{r}
-grid[which.max(xgb_train_auc$xgb_train_auc), ] 
+grid[which.min(xgb_train_rmse$xgb_train_rmse), ] 
 
 
-xgb_train_auc |> ggplot(aes(x = simulacion, y = xgb_train_auc)) + 
+xgb_train_rmse |> ggplot(aes(x = simulacion, y = xgb_train_rmse)) + 
   geom_line() +
-  geom_vline(xintercept = 277, linetype = 2, col = "red") +
-  geom_hline(yintercept = 0.7764942, linetype = 2, col = "red") +
+  geom_vline(xintercept = 571, linetype = 2, col = "red") +
   theme_minimal() 
 ```
-
 
 
 ```{r, eval=FALSE}
@@ -319,11 +318,12 @@ modelo <- xgboost(
   objective = "binary:logistic",
   eta = 0.4,
   max_depth = 10,
-  lambda = 2,
+  subsample = 1,
+  lambda = 1,
   alpha = 0,
   nrounds = 1000,
   early_stopping_rounds = 3,
-  eval_metric = "auc",
+  eval_metric = "rmse",
   data = sparse_matrix,
   label = y
 )
@@ -334,20 +334,27 @@ ggplot(modelo$evaluation_log, aes(
 )) + geom_line() 
 ```
 
-```{r}
-sparse_matrix <- sparse.model.matrix(pobreza ~ ., data = test)[, -1]
+### Validación Cruzada
 
+```{r}
+modelo <- readRDS("pobreza/output/modelo_tree.rds")
+```
+
+
+```{r}
 pred <- predict(modelo, newdata = sparse_matrix)
 ```
 
 ```{r}
-test$pred <- as.numeric(pred > 0.5) 
+saveRDS(pred, "pobreza/output/pred.rds")
 ```
 
-### Validación Cruzada
+```{r}
+encuesta_mrp$pred <- as.numeric(pred > 0.5) 
+```
 
 ```{r}
-confusion.mat <- table(test$pobreza, test$pred)
+confusion.mat <- table(encuesta_mrp$pobreza, encuesta_mrp$pred)
 dimnames(confusion.mat) <- list("Reales" = c("PP", "FN"), "predichos" = c("PN", "FP"))
 
 confusion.mat
@@ -368,37 +375,7 @@ KS = function(pred,y) {
 }
 ```
 
-```{r}
-KS(test$pred, test$pobreza)
-```
-
-```{r}
-eval <- function(y, pred){
-  confu = table(y, pred)
-  e = 1 - sum(diag(confu))/sum(confu)
-  falsos = 1 - diag(confu)/apply(confu, 1, sum)
-  error = c(e, falsos)*100
-  auc = curvaROC(pred, y)$auc
-  ks = KS(pred, y)
-  indicadores = c(error, auc, KS)
-  names(indicadores) = c("e","FP","FN","AUC","KS")
-  return(list(Matriz = confu, indicadores = indicadores))
-}
-```
-
-
-```{r}
-eval(test$pobreza, as.numeric(test$pred))
-```
-
-
 ### Curva de ROC
-
-```{r}
-predict1 <- prediction(as.numeric(test$pred), test$pobreza)
-attributes(performance(predict1, "auc"))$y.values[[1]]*100
-```
-
 
 ```{r}
 library(ROCR)
@@ -427,18 +404,37 @@ curvaROC = function(pred,y, grafico = F) {
 }
 ```
 
+
 ```{r}
-xgb.plot.tree(model = modelo, trees = 235)
+KS(encuesta_mrp$pred, encuesta_mrp$pobreza)
+```
+
+```{r}
+eval <- function(y, pred){
+  confu = table(y, pred)
+  e = 1 - sum(diag(confu))/sum(confu)
+  falsos = 1 - diag(confu)/apply(confu, 1, sum)
+  error = c(e, falsos)*100
+  auc = curvaROC(pred, y)$auc
+  ks = KS(pred, y)
+  indicadores = c(error, auc, KS)
+  names(indicadores) = c("e","FP","FN","AUC","KS")
+  return(list(Matriz = confu, indicadores = indicadores))
+}
 ```
 
 
 ```{r}
-curvaROC(test$pred, test$pobreza, grafico = TRUE)
+eval(encuesta_mrp$pobreza, as.numeric(encuesta_mrp$pred))
+```
+
+```{r}
+curvaROC(encuesta_mrp$pred, encuesta_mrp$pobreza, grafico = TRUE)
 ```
 
 - La curva de ROC muestra el rendimiento de un modelo de clasificación en todos los umbrales de clasificación. 
 Esta permite ver la precisión positiva contra los falsos positivos en diferentes umbrales. Lo esperado es tener más falsos positivos y más precisión positiva. 
-Una forma de interpretar esto es como la probabilidad de que el modelo clasifique un ejemplo positivo aleatorio más alto que un ejemplo negativo aleatorio. Como en este caso el valor del AUC es de 0.51, esto es como tomar la decisión de clasificación con una moneda al aire. Y por lo tanto, el modelo es pobre al no ser predictivo. 
+Una forma de interpretar esto es como la probabilidad de que el modelo clasifique un ejemplo positivo aleatorio más alto que un ejemplo negativo aleatorio. Como en este caso el valor del AUC es de 0.60, el modelo logra clasificar de cierto forma bien. 
 
 
 ## Predicción con el censo
@@ -453,7 +449,7 @@ modelo <- readRDS("pobreza/output/modelo_tree.rds")
 
 
 ```{r}
-censo_mrp <- readRDS("ingreso/datos/cens0.rds") |> ungroup() |>
+censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") |> ungroup() |>
   dplyr::select(area, sexo, anoest,edad, discapacidad, 
          F182013_stable_lights, X2016_crops.coverfraction,
          X2016_urban.coverfraction, X2016_gHM,
@@ -470,7 +466,7 @@ censo_mrp <- readRDS("ingreso/datos/cens0.rds") |> ungroup() |>
   dplyr::rename(
   area_cat = area,
   sexo_cat = sexo,
-  edad_cat = edad,
+  # edad_cat = edad,
   anoest_cat = anoest,
   discapacidad_cat = discapacidad
 )
@@ -486,19 +482,11 @@ pred <- predict(modelo, newdata = sparse_matrix)
 ```
 
 ```{r}
-saveRDS(pred, file = "pobreza/output/pred.rds")
-```
-
-```{r}
-pred <- readRDS("pobreza/output/pred.rds")
+saveRDS(pred, file = "pobreza/output/pred_censo.rds")
 ```
 
 ```{r}
 censo_mrp$pred <- as.numeric(pred > 0.5)
-```
-
-```{r}
-
 ```
 
 

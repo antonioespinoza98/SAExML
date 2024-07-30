@@ -25,7 +25,7 @@ rm(list = ls())
 ## Encuesta lineal
 
 ```{r}
-encuesta_mrp <- readRDS("ingreso/datos/encuesta_mrp1.rds") %>%
+encuesta_mrp <- readRDS("pobreza/datos/encuesta_mrp1.rds") %>%
   dplyr::filter(anoest != "98") |>
         mutate(
   region = recode(dam,
@@ -37,25 +37,9 @@ encuesta_mrp <- readRDS("ingreso/datos/encuesta_mrp1.rds") %>%
                "06" = "Huetar Norte")) %>%
   mutate(region = as.factor(region)) %>% 
   mutate_if(is.character, as.factor) %>% 
-  mutate(dam = as.factor(dam))
-```
+  mutate(dam = as.factor(dam))  |>
+  mutate(pobreza = ifelse(ingreso <= lp, 1, 0)) 
 
-## Encuesta edad Categórica
-
-```{r}
-encuesta_mrp <- readRDS("ingreso/datos/encuesta_mrp.rds") %>%
-  dplyr::filter(anoest != "98") |>
-        mutate(
-  region = recode(dam,
-               "01" = "Central",
-               "02" = "Chorotega",
-               "03" = "Pacífico Central",
-               "04" = "Brunca",
-               "05" = "Huetar Caribe",
-               "06" = "Huetar Norte")) %>%
-  mutate(region = as.factor(region)) %>% 
-  mutate_if(is.character, as.factor) %>% 
-  mutate(dam = as.factor(dam))
 ```
 
 
@@ -70,7 +54,7 @@ diseno <- encuesta_mrp  %>%
 
 ```{r}
 media_est_srvyr <- svyby(
-  ~ingreso,
+  ~pobreza,
   by = ~region,
   design = diseno,
   svymean
@@ -80,7 +64,7 @@ media_est_srvyr <- svyby(
 ## Intervalos de confianza
 
 ```{r}
-confint_int <- confint(svyby(formula = ~ingreso,
+confint_int <- confint(svyby(formula = ~pobreza,
                              by = ~region,
                              design = diseno,
                              svymean))
@@ -88,98 +72,16 @@ confint_int <- confint(svyby(formula = ~ingreso,
 confint_int <- data.table(confint_int, keep.rownames = TRUE)
 colnames(confint_int) <- c("region","min_inter", "max_inter")
 
-confint_int$ingreso <- media_est_srvyr$ingreso
+confint_int$pobreza <- media_est_srvyr$pobreza
 
 ```
 
-# Primera predicción (GBlinear)
-
-## Censo lineal
-
-```{r}
-censo_mrp <- censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") %>%
-  dplyr::filter(anoest != "98") |>
-      mutate(
-  region = recode(dam,
-               "01" = "Central",
-               "02" = "Chorotega",
-               "03" = "Pacífico Central",
-               "04" = "Brunca",
-               "05" = "Huetar Caribe",
-               "06" = "Huetar Norte")) %>%
-  mutate(region = as.factor(region)) 
-```
-
-## Censo cat
-```{r}
-censo_mrp <- censo_mrp <- readRDS("ingreso/datos/cens0.rds") %>%
-  dplyr::filter(anoest != "98") |>
-      mutate(
-  region = recode(dam,
-               "01" = "Central",
-               "02" = "Chorotega",
-               "03" = "Pacífico Central",
-               "04" = "Brunca",
-               "05" = "Huetar Caribe",
-               "06" = "Huetar Norte")) %>%
-  mutate(region = as.factor(region)) 
-```
-
-
-```{r}
-pred <- readRDS("ingreso/output/pred.rds")
-pred_cat <- readRDS("ingreso/output/pred_cat.rds")
-```
-
-```{r}
-censo_mrp$pred_ingreso <- pred
-censo_mrp$pred_ingreso <- pred_cat
-```
-
-## Calculo ingreso
-
-```{r}
-ingreso_dam <- censo_mrp %>% 
-  group_by(region) %>% 
-  summarise(
-    ingreso = mean(pred_ingreso)
-  ) 
-```
-
-
-```{r}
-mapping <- rbind(media_est_srvyr[,-3], ingreso_dam)
-
-estim <- c(rep("Directo", 6), rep("XGBoost", 6))
-
-mapping <- cbind(mapping, estim)
-```
-
-
-## Gráfico
-
-```{r}
-
-p1 <- mapping %>%
-  ggplot(aes(x = region, y = ingreso)) + geom_point(aes(color = estim), size = 2, position = "jitter") +
-  scale_color_manual(values = c("red", "green")) +
-  labs(title = "Validación para modelo de regresión", x = "Región de planificación", y = "Ingreso", col = "Modelo") +
-  geom_errorbar(data = confint_int, aes(x = region, ymin = min_inter, ymax = max_inter)) +
-  theme_minimal()
-
-```
-
-```{r}
-saveRDS(p1, "ingreso/output/validacion_regre.rds")
-```
-
-
-# Segunda predicción (GBtree)
+# predicción (GBtree)
 
 ## Censo
 
 ```{r}
-censo_mrp <- censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") %>%
+censo_mrp <- censo_mrp <- readRDS("pobreza/datos/censo_mrp1.rds") %>%
   dplyr::filter(anoest != "98") |>
       mutate(
   region = recode(dam,
@@ -194,26 +96,26 @@ censo_mrp <- censo_mrp <- readRDS("ingreso/datos/censo_mrp1.rds") %>%
 
 
 ```{r}
-pred2 <- readRDS("ingreso/output/pred2.rds")
+pred <- readRDS("pobreza/output/pred_censo.rds")
 ```
 
 ```{r}
-censo_mrp$pred_ingreso <- pred2
+censo_mrp$pred_pobreza <- pred
 ```
 
-## Calculo ingreso
+## Calculo pobreza
 
 ```{r}
-ingreso_dam <- censo_mrp %>% 
+pobreza_dam <- censo_mrp %>% 
   group_by(region) %>% 
   summarise(
-    ingreso = mean(pred_ingreso)
+    pobreza = mean(pred_pobreza)
   ) 
 ```
 
 
 ```{r}
-mapping <- rbind(media_est_srvyr[,-3], ingreso_dam)
+mapping <- rbind(media_est_srvyr[,-3], pobreza_dam)
 
 estim <- c(rep("Directo", 6), rep("XGBoost", 6))
 
@@ -225,154 +127,16 @@ mapping <- cbind(mapping, estim)
 
 ```{r}
 p2 <- mapping %>%
-  ggplot(aes(x = region, y = ingreso)) + geom_point(aes(color = estim), size = 2, position = "jitter") +
+  ggplot(aes(x = region, y = pobreza)) + geom_point(aes(color = estim), size = 2, position = "jitter") +
   scale_color_manual(values = c("red", "green")) +
-  labs(title = "Validación para modelo de árbol", x = "Región de planificación", y = "Ingreso", col = "Modelo") +
+  labs(title = "Validación para modelo de árbol", x = "Región de planificación", y = "Pobreza", col = "Modelo") +
   geom_errorbar(data = confint_int, aes(x = region, ymin = min_inter, ymax = max_inter)) +
   theme_minimal()
 ```
 
 
 ```{r}
-saveRDS(p2, "ingreso/output/validacion_arbol.rds")
-```
-
-# Tercera predicción (GBtree)
-
-## Encuesta
-
-```{r}
-encuesta_mrp <- readRDS("ingreso/datos/encuesta_mrp.rds") %>%
-  dplyr::filter(anoest != "98") |>
-        mutate(
-  region = recode(dam,
-               "01" = "Central",
-               "02" = "Chorotega",
-               "03" = "Pacífico Central",
-               "04" = "Brunca",
-               "05" = "Huetar Caribe",
-               "06" = "Huetar Norte")) %>%
-  mutate(region = as.factor(region)) %>% 
-  mutate_if(is.character, as.factor) %>% 
-  mutate(dam = as.factor(dam))
-```
-
-## Diseño
-
-```{r}
-diseno <- encuesta_mrp  %>% 
-  as_survey_design(weights = fep)
-```
-
-## Cálculo estimador directo
-
-```{r}
-media_est_srvyr <- svyby(
-  ~ingreso,
-  by = ~region,
-  design = diseno,
-  svymean
-)
-```
-
-## Intervalos de confianza
-
-```{r}
-confint_int <- confint(svyby(formula = ~ingreso,
-                             by = ~region,
-                             design = diseno,
-                             svymean))
-
-confint_int <- data.table(confint_int, keep.rownames = TRUE)
-colnames(confint_int) <- c("region","min_inter", "max_inter")
-
-confint_int$ingreso <- media_est_srvyr$ingreso
-
-```
-
-
-## Censo
-
-```{r}
-rm(list = ls())
-```
-
-
-```{r}
-censo_mrp <- censo_mrp <- readRDS("ingreso/datos/cens0.rds") %>%
-  dplyr::filter(anoest != "98") |>
-      mutate(
-  region = recode(dam,
-               "01" = "Central",
-               "02" = "Chorotega",
-               "03" = "Pacífico Central",
-               "04" = "Brunca",
-               "05" = "Huetar Caribe",
-               "06" = "Huetar Norte")) %>%
-  mutate(region = as.factor(region))
-```
-
-
-```{r}
-pred3 <- readRDS("ingreso/output/pred3.rds")
-```
-
-```{r}
-censo_mrp$pred_ingreso <- pred3
-```
-
-## Calculo ingreso
-
-```{r}
-ingreso_dam <- censo_mrp %>% 
-  group_by(region) %>% 
-  summarise(
-    ingreso = mean(pred_ingreso)
-  ) 
-```
-
-
-```{r}
-mapping <- rbind(media_est_srvyr[,-3], ingreso_dam)
-
-estim <- c(rep("Directo", 6), rep("XGBoost", 6))
-
-mapping <- cbind(mapping, estim)
-```
-
-
-## Gráfico
-
-```{r}
-
-p3 <- mapping %>%
-  ggplot(aes(x = region, y = ingreso)) + 
-  geom_point(aes(color = estim), size = 2, position = "jitter") +
-  scale_color_manual(values = c("red", "green")) +
-  labs(x = "Región de planificación", y = "Ingreso", col = "Modelo") +
-  geom_errorbar(data = confint_int, 
-                aes(x = region, ymin = min_inter, ymax = max_inter)) +
-  ylim(0,400000) +
-  theme_minimal()
-
-```
-
-
-```{r}
-saveRDS(p3, "ingreso/output/validacion_arbol_edadcat.rds")
-```
-
-
-# Comparación
-
-```{r}
-p1 <- readRDS("ingreso/output/validacion_regre.rds")
-p2 <- readRDS("ingreso/output/validacion_arbol.rds")
-```
-
-
-```{r}
-grid.arrange(p1, p2)
+saveRDS(p2, "pobreza/output/validacion_arbol.rds")
 ```
 
 # Benchmark
